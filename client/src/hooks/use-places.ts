@@ -2,7 +2,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { InsertPlace, Place } from "@shared/schema";
 
-export function usePlaces(filters?: { search?: string; category?: string; sort?: string }) {
+export interface PlaceFilters {
+  search?: string;
+  category?: string;
+  sort?: string;
+  kidFriendly?: boolean;
+  indoorOutdoor?: 'indoor' | 'outdoor' | 'all';
+  maxDistance?: number;
+  minRating?: number;
+  wheelchairAccessible?: boolean;
+  favoritesOnly?: boolean;
+}
+
+export function usePlaces(filters?: PlaceFilters) {
   const queryKey = [api.places.list.path, filters];
   return useQuery({
     queryKey,
@@ -12,6 +24,12 @@ export function usePlaces(filters?: { search?: string; category?: string; sort?:
       if (filters?.search) cleanFilters.search = filters.search;
       if (filters?.category && filters.category !== 'all') cleanFilters.category = filters.category;
       if (filters?.sort) cleanFilters.sort = filters.sort;
+      if (filters?.kidFriendly) cleanFilters.kidFriendly = 'true';
+      if (filters?.indoorOutdoor && filters.indoorOutdoor !== 'all') cleanFilters.indoorOutdoor = filters.indoorOutdoor;
+      if (filters?.maxDistance) cleanFilters.maxDistance = filters.maxDistance.toString();
+      if (filters?.minRating) cleanFilters.minRating = filters.minRating.toString();
+      if (filters?.wheelchairAccessible) cleanFilters.wheelchairAccessible = 'true';
+      if (filters?.favoritesOnly) cleanFilters.favoritesOnly = 'true';
 
       const url = filters ? `${api.places.list.path}?${new URLSearchParams(cleanFilters)}` : api.places.list.path;
       

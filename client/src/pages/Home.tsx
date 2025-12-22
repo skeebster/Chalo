@@ -5,21 +5,29 @@ import { Categories } from "@/components/Categories";
 import { PlaceCard } from "@/components/PlaceCard";
 import { PlaceDetail } from "@/components/PlaceDetail";
 import { UploadModal } from "@/components/UploadModal";
-import { usePlaces, useImportSampleData } from "@/hooks/use-places";
+import { FilterPanel } from "@/components/FilterPanel";
+import { usePlaces, useImportSampleData, PlaceFilters } from "@/hooks/use-places";
 import { Place } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Loader2, Database } from "lucide-react";
 
 export default function Home() {
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [filters, setFilters] = useState<PlaceFilters>({
+    category: "all",
+    search: "",
+  });
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
 
-  const { data: places, isLoading, refetch } = usePlaces({ 
-    category: selectedCategory, 
-    search: searchQuery 
-  });
+  const { data: places, isLoading, refetch } = usePlaces(filters);
+
+  const handleSearch = (query: string) => {
+    setFilters(prev => ({ ...prev, search: query }));
+  };
+
+  const handleCategorySelect = (category: string) => {
+    setFilters(prev => ({ ...prev, category }));
+  };
   
   const importMutation = useImportSampleData();
 
@@ -33,7 +41,7 @@ export default function Home() {
       
       <main className="container mx-auto px-4 pt-6 space-y-8">
         <Hero 
-          onSearch={setSearchQuery} 
+          onSearch={handleSearch} 
           onUploadClick={() => setIsUploadOpen(true)} 
         />
 
@@ -43,10 +51,13 @@ export default function Home() {
               Explore Destinations
             </h2>
             <Categories 
-              selectedCategory={selectedCategory} 
-              onSelect={setSelectedCategory} 
+              selectedCategory={filters.category || "all"} 
+              onSelect={handleCategorySelect} 
             />
           </div>
+
+          {/* Advanced Filters */}
+          <FilterPanel filters={filters} onFiltersChange={setFilters} />
 
           {isLoading ? (
             <div className="flex justify-center py-20">
@@ -69,12 +80,12 @@ export default function Home() {
               </div>
               <h3 className="text-xl font-bold text-white mb-2">No places found</h3>
               <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                {searchQuery || selectedCategory !== 'all' 
+                {filters.search || filters.category !== 'all' || filters.kidFriendly || filters.wheelchairAccessible || filters.favoritesOnly
                   ? "Try adjusting your filters or search query." 
                   : "Get started by importing sample destinations or upload your own."}
               </p>
               
-              {!searchQuery && selectedCategory === 'all' && (
+              {!filters.search && filters.category === 'all' && !filters.kidFriendly && !filters.wheelchairAccessible && !filters.favoritesOnly && (
                 <Button onClick={handleImport} disabled={importMutation.isPending}>
                   {importMutation.isPending ? "Importing..." : "Import Sample Data"}
                 </Button>

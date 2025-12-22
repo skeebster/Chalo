@@ -8,11 +8,23 @@ import {
   type Favorite, type InsertFavorite,
   insertUserPreferencesSchema
 } from "@shared/schema";
-import { eq, desc, ilike, or, and, inArray } from "drizzle-orm";
+import { eq, desc, ilike, or, and, inArray, lte, gte, sql } from "drizzle-orm";
+
+export interface PlaceFilterOptions {
+  search?: string;
+  category?: string;
+  sort?: string;
+  kidFriendly?: boolean;
+  indoorOutdoor?: 'indoor' | 'outdoor' | 'all';
+  maxDistance?: number;
+  minRating?: number;
+  wheelchairAccessible?: boolean;
+  favoriteIds?: number[];
+}
 
 export interface IStorage {
   // Places
-  getPlaces(search?: string, category?: string, sort?: string): Promise<Place[]>;
+  getPlaces(filters?: PlaceFilterOptions): Promise<Place[]>;
   getPlace(id: number): Promise<Place | undefined>;
   createPlace(place: InsertPlace): Promise<Place>;
   updatePlace(id: number, updates: UpdatePlaceRequest): Promise<Place>;
@@ -42,13 +54,13 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   // === Places ===
-  async getPlaces(search?: string, category?: string, sort?: string): Promise<Place[]> {
+  async getPlaces(filters?: PlaceFilterOptions): Promise<Place[]> {
     let query = db.select().from(places);
     
     // Apply filters
     const conditions = [];
-    if (search) {
-      const searchLower = `%${search.toLowerCase()}%`;
+    if (filters?.search) {
+      const searchLower = `%${filters.search.toLowerCase()}%`;
       conditions.push(
         or(
           ilike(places.name, searchLower),
@@ -59,8 +71,32 @@ export class DatabaseStorage implements IStorage {
       );
     }
     
-    if (category && category !== 'all') {
-      conditions.push(ilike(places.category, category));
+    if (filters?.category && filters.category !== 'all') {
+      conditions.push(ilike(places.category, filters.category));
+    }
+
+    if (filters?.kidFriendly) {
+      conditions.push(eq(places.kidFriendly, true));
+    }
+
+    if (filters?.indoorOutdoor && filters.indoorOutdoor !== 'all') {
+      conditions.push(eq(places.indoorOutdoor, filters.indoorOutdoor));
+    }
+
+    if (filters?.maxDistance) {
+      conditions.push(lte(places.distanceMiles, filters.maxDistance));
+    }
+
+    if (filters?.minRating) {
+      conditions.push(gte(places.googleRating, filters.minRating.toString()));
+    }
+
+    if (filters?.wheelchairAccessible) {
+      conditions.push(eq(places.wheelchairAccessible, true));
+    }
+
+    if (filters?.favoriteIds && filters.favoriteIds.length > 0) {
+      conditions.push(inArray(places.id, filters.favoriteIds));
     }
     
     if (conditions.length > 0) {
@@ -68,9 +104,9 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Apply sorting
-    if (sort === 'distance') {
+    if (filters?.sort === 'distance') {
       query = query.orderBy(places.distanceMiles);
-    } else if (sort === 'rating') {
+    } else if (filters?.sort === 'rating') {
       query = query.orderBy(desc(places.googleRating));
     } else {
       query = query.orderBy(desc(places.createdAt));

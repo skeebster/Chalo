@@ -631,8 +631,25 @@ export async function registerRoutes(
   // === Places API ===
   app.get(api.places.list.path, async (req, res) => {
     try {
-      const { search, category, sort } = req.query as any;
-      const places = await storage.getPlaces(search, category, sort);
+      const { search, category, sort, kidFriendly, indoorOutdoor, maxDistance, minRating, wheelchairAccessible, favoritesOnly } = req.query as any;
+      
+      // Build filter options
+      let favoriteIds: number[] | undefined;
+      if (favoritesOnly === 'true') {
+        favoriteIds = await storage.getFavorites();
+      }
+
+      const places = await storage.getPlaces({
+        search,
+        category,
+        sort,
+        kidFriendly: kidFriendly === 'true',
+        indoorOutdoor: indoorOutdoor as 'indoor' | 'outdoor' | 'all' | undefined,
+        maxDistance: maxDistance ? parseFloat(maxDistance) : undefined,
+        minRating: minRating ? parseFloat(minRating) : undefined,
+        wheelchairAccessible: wheelchairAccessible === 'true',
+        favoriteIds,
+      });
       res.json(places);
     } catch (error) {
       console.error("Error listing places:", error);
