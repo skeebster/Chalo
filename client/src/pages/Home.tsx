@@ -4,7 +4,7 @@ import { Hero } from "@/components/Hero";
 import { Categories } from "@/components/Categories";
 import { PlaceCard } from "@/components/PlaceCard";
 import { PlaceDetail } from "@/components/PlaceDetail";
-import { UploadModal } from "@/components/UploadModal";
+import { AddPlaceModal } from "@/components/AddPlaceModal";
 import { FilterPanel } from "@/components/FilterPanel";
 import { usePlaces, useImportSampleData, PlaceFilters } from "@/hooks/use-places";
 import { Place } from "@shared/schema";
@@ -102,8 +102,8 @@ export default function Home() {
         onOpenChange={(open) => !open && setSelectedPlace(null)} 
       />
 
-      {/* Upload Modal */}
-      <UploadModal 
+      {/* Add Place Modal */}
+      <AddPlaceModal 
         open={isUploadOpen} 
         onOpenChange={setIsUploadOpen}
         onSuccess={() => refetch()}

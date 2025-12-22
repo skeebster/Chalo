@@ -7,7 +7,55 @@ import OpenAI from "openai";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
-import { getReviewAnalysis } from "./google-places";
+import { getReviewAnalysis, lookupPlaceFromUrl, lookupPlaceByName, processVoiceTranscript } from "./google-places";
+import type { InsertPlace } from "@shared/schema";
+
+// Helper to validate and fill required fields for place creation
+function validateAndFillPlace(partialPlace: Partial<InsertPlace>): InsertPlace | null {
+  // Name is absolutely required
+  if (!partialPlace.name || partialPlace.name.trim().length === 0) {
+    return null;
+  }
+  
+  // Fill in required fields with defaults
+  return {
+    name: partialPlace.name.trim(),
+    overview: partialPlace.overview || `A destination to explore.`,
+    address: partialPlace.address || null,
+    googleMapsUrl: partialPlace.googleMapsUrl || null,
+    distanceMiles: partialPlace.distanceMiles || null,
+    driveTimeMinutes: partialPlace.driveTimeMinutes || null,
+    category: partialPlace.category || "Attraction",
+    subcategory: partialPlace.subcategory || null,
+    keyHighlights: partialPlace.keyHighlights || null,
+    insiderTips: partialPlace.insiderTips || null,
+    entryFee: partialPlace.entryFee || null,
+    averageSpend: partialPlace.averageSpend || null,
+    bestSeasons: partialPlace.bestSeasons || null,
+    bestDay: partialPlace.bestDay || null,
+    bestTimeOfDay: partialPlace.bestTimeOfDay || "Early morning (9-11am) for smaller crowds",
+    parkingInfo: partialPlace.parkingInfo || null,
+    evCharging: partialPlace.evCharging || null,
+    googleRating: partialPlace.googleRating || null,
+    tripadvisorRating: partialPlace.tripadvisorRating || null,
+    overallSentiment: partialPlace.overallSentiment || null,
+    nearbyRestaurants: Array.isArray(partialPlace.nearbyRestaurants) ? partialPlace.nearbyRestaurants : [],
+    averageVisitDuration: partialPlace.averageVisitDuration || null,
+    upcomingEvents: partialPlace.upcomingEvents || null,
+    researchSources: partialPlace.researchSources || null,
+    wheelchairAccessible: partialPlace.wheelchairAccessible ?? false,
+    adaCompliant: partialPlace.adaCompliant ?? false,
+    serviceAnimalsAllowed: partialPlace.serviceAnimalsAllowed ?? true,
+    accessibilityNotes: partialPlace.accessibilityNotes || "Contact venue for specific accessibility needs.",
+    publicTransit: partialPlace.publicTransit || null,
+    kidFriendly: partialPlace.kidFriendly ?? true,
+    indoorOutdoor: partialPlace.indoorOutdoor || "both",
+    visited: partialPlace.visited ?? false,
+    visitedDate: partialPlace.visitedDate || null,
+    userNotes: partialPlace.userNotes || null,
+    imageUrl: partialPlace.imageUrl || null,
+  };
+}
 
 // Sample data for import - from CSV with real images
 const samplePlaces = [
@@ -785,6 +833,90 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Extraction error:", error);
       res.status(500).json({ message: "Failed to extract data" });
+    }
+  });
+
+  // === Import from Google Maps URL ===
+  app.post("/api/places/import-url", async (req, res) => {
+    try {
+      const { url } = req.body;
+      
+      if (!url) {
+        return res.status(400).json({ success: false, error: "URL is required" });
+      }
+      
+      const result = await lookupPlaceFromUrl(url);
+      
+      if (!result.success || !result.place) {
+        return res.status(400).json({ success: false, error: result.error || "Failed to lookup place" });
+      }
+      
+      // Validate and fill required fields
+      const validatedPlace = validateAndFillPlace(result.place);
+      if (!validatedPlace) {
+        return res.status(400).json({ success: false, error: "Could not determine place name from URL" });
+      }
+      
+      // Create the place in database
+      const place = await storage.createPlace(validatedPlace);
+      
+      res.json({ success: true, place });
+    } catch (error) {
+      console.error("Import URL error:", error);
+      res.status(500).json({ success: false, error: "Failed to import from URL" });
+    }
+  });
+
+  // === Import from Voice Transcript ===
+  app.post("/api/places/import-voice", async (req, res) => {
+    try {
+      const { transcript } = req.body;
+      
+      if (!transcript) {
+        return res.status(400).json({ success: false, error: "Voice transcript is required" });
+      }
+      
+      const result = await processVoiceTranscript(transcript);
+      
+      if (!result.success || !result.place) {
+        return res.status(400).json({ success: false, error: result.error || "Failed to process voice input" });
+      }
+      
+      // Validate and fill required fields
+      const validatedPlace = validateAndFillPlace(result.place);
+      if (!validatedPlace) {
+        return res.status(400).json({ success: false, error: "Could not determine place name from voice input" });
+      }
+      
+      // Create the place in database
+      const place = await storage.createPlace(validatedPlace);
+      
+      res.json({ success: true, place });
+    } catch (error) {
+      console.error("Import voice error:", error);
+      res.status(500).json({ success: false, error: "Failed to import from voice" });
+    }
+  });
+
+  // === Lookup place by name (for enhanced screenshot extraction) ===
+  app.post("/api/places/lookup", async (req, res) => {
+    try {
+      const { name, context } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ success: false, error: "Place name is required" });
+      }
+      
+      const result = await lookupPlaceByName(name, context);
+      
+      if (!result.success) {
+        return res.status(400).json({ success: false, error: result.error });
+      }
+      
+      res.json({ success: true, place: result.place });
+    } catch (error) {
+      console.error("Lookup error:", error);
+      res.status(500).json({ success: false, error: "Failed to lookup place" });
     }
   });
 

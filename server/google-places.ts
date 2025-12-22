@@ -1,5 +1,6 @@
 import { z } from "zod";
 import OpenAI from "openai";
+import type { InsertPlace, NearbyRestaurant } from "@shared/schema";
 
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 
@@ -7,6 +8,12 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
+
+export interface PlaceLookupResult {
+  success: boolean;
+  place?: Partial<InsertPlace>;
+  error?: string;
+}
 
 export interface ReviewInsight {
   sentimentScore: number;
@@ -197,4 +204,362 @@ export async function getReviewAnalysis(placeName: string, address?: string): Pr
     insights,
     googleMapsUrl,
   };
+}
+
+// Extract place ID from various Google Maps URL formats
+export function extractPlaceIdFromUrl(url: string): string | null {
+  // Format: https://www.google.com/maps/place/.../@lat,lng,.../data=...!1s0x...:0x...!...
+  // Format: https://maps.google.com/?cid=...
+  // Format: https://www.google.com/maps?cid=...
+  // Format: https://goo.gl/maps/...
+  // Format: place_id embedded in URL
+  
+  try {
+    // Try to find place_id in URL
+    const placeIdMatch = url.match(/place_id[=:]([A-Za-z0-9_-]+)/);
+    if (placeIdMatch) return placeIdMatch[1];
+    
+    // Try to find CID format
+    const cidMatch = url.match(/cid[=:](\d+)/);
+    if (cidMatch) return null; // CID needs different handling
+    
+    // For other formats, we'll search by extracted name/address
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Get comprehensive place details for creating a card
+async function getFullPlaceDetails(placeId: string): Promise<any | null> {
+  if (!GOOGLE_PLACES_API_KEY) {
+    console.log("Google Places API key not configured");
+    return null;
+  }
+
+  const url = `https://places.googleapis.com/v1/places/${placeId}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+        "X-Goog-FieldMask": "id,displayName,formattedAddress,addressComponents,rating,userRatingCount,reviews,regularOpeningHours,priceLevel,types,primaryType,primaryTypeDisplayName,editorialSummary,websiteUri,nationalPhoneNumber,googleMapsUri,photos,accessibilityOptions,parkingOptions,paymentOptions,currentOpeningHours",
+      },
+    });
+    
+    const data = await response.json();
+    console.log("Full place details response:", JSON.stringify(data).substring(0, 500));
+    
+    if (data.id) {
+      return data;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error fetching full place details:", error);
+    return null;
+  }
+}
+
+// Search for nearby restaurants
+async function searchNearbyRestaurants(lat: number, lng: number): Promise<NearbyRestaurant[]> {
+  if (!GOOGLE_PLACES_API_KEY) return [];
+
+  const url = "https://places.googleapis.com/v1/places:searchNearby";
+  
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+        "X-Goog-FieldMask": "places.displayName,places.rating,places.priceLevel,places.types,places.primaryTypeDisplayName",
+      },
+      body: JSON.stringify({
+        includedTypes: ["restaurant", "cafe", "bakery"],
+        maxResultCount: 5,
+        locationRestriction: {
+          circle: {
+            center: { latitude: lat, longitude: lng },
+            radius: 1000.0, // 1km radius
+          },
+        },
+      }),
+    });
+    
+    const data = await response.json();
+    
+    if (data.places) {
+      return data.places.map((place: any) => ({
+        name: place.displayName?.text || "Unknown",
+        rating: place.rating,
+        priceRange: place.priceLevel ? "$".repeat(place.priceLevel) : undefined,
+        cuisine: place.primaryTypeDisplayName?.text,
+        distance: "Nearby",
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error("Error searching nearby restaurants:", error);
+    return [];
+  }
+}
+
+// Lookup a place by name and get full details for card creation
+export async function lookupPlaceByName(placeName: string, additionalContext?: string): Promise<PlaceLookupResult> {
+  if (!placeName || placeName.trim().length === 0) {
+    return { success: false, error: "Place name is required" };
+  }
+  
+  const query = additionalContext ? `${placeName} ${additionalContext}` : placeName;
+  const { placeId, googleMapsUrl } = await searchPlaceId(query);
+  
+  if (!placeId) {
+    return { success: false, error: `Could not find place: ${placeName}` };
+  }
+  
+  const details = await getFullPlaceDetails(placeId);
+  
+  if (!details) {
+    return { success: false, error: `Could not fetch details for: ${placeName}` };
+  }
+  
+  // Map Google Places data to our schema with required field defaults
+  const place: Partial<InsertPlace> = {
+    name: details.displayName?.text || placeName,
+    address: details.formattedAddress || null,
+    googleMapsUrl: details.googleMapsUri || googleMapsUrl || null,
+    googleRating: details.rating?.toString() || null,
+    overview: details.editorialSummary?.text || `A destination found via Google Places.`,
+    category: details.primaryTypeDisplayName?.text || mapGoogleTypeToCategory(details.types) || "Attraction",
+    subcategory: null,
+    keyHighlights: null,
+    insiderTips: null,
+    entryFee: null,
+    averageSpend: null,
+    bestSeasons: null,
+    bestDay: null,
+    bestTimeOfDay: "Early morning (9-11am) for smaller crowds",
+    parkingInfo: details.parkingOptions ? formatParkingInfo(details.parkingOptions) : null,
+    evCharging: null,
+    tripadvisorRating: null,
+    overallSentiment: null,
+    nearbyRestaurants: [],
+    averageVisitDuration: null,
+    upcomingEvents: null,
+    researchSources: null,
+    wheelchairAccessible: details.accessibilityOptions?.wheelchairAccessibleEntrance || 
+                          details.accessibilityOptions?.wheelchairAccessibleSeating || false,
+    adaCompliant: details.accessibilityOptions?.wheelchairAccessibleEntrance || false,
+    serviceAnimalsAllowed: true,
+    accessibilityNotes: "Contact venue for specific accessibility needs.",
+    publicTransit: null,
+    kidFriendly: true,
+    indoorOutdoor: mapTypesToIndoorOutdoor(details.types) || "both",
+    visited: false,
+    visitedDate: null,
+    userNotes: null,
+    imageUrl: null,
+  };
+  
+  return { success: true, place };
+}
+
+// Lookup place from Google Maps URL
+export async function lookupPlaceFromUrl(googleMapsUrl: string): Promise<PlaceLookupResult> {
+  if (!GOOGLE_PLACES_API_KEY) {
+    return { success: false, error: "Google Places API key not configured" };
+  }
+
+  if (!googleMapsUrl || !googleMapsUrl.trim()) {
+    return { success: false, error: "URL is required" };
+  }
+
+  // Validate it looks like a Google Maps URL
+  const lowerUrl = googleMapsUrl.toLowerCase();
+  if (!lowerUrl.includes("google.com/maps") && 
+      !lowerUrl.includes("maps.google.com") && 
+      !lowerUrl.includes("goo.gl/maps") &&
+      !lowerUrl.includes("maps.app.goo.gl")) {
+    return { success: false, error: "Please provide a valid Google Maps URL" };
+  }
+
+  // Try to extract place name from URL for text search
+  try {
+    let searchQuery = "";
+    
+    // Format 1: /maps/place/Place+Name/... or /maps/place/Place+Name@lat,lng
+    const placeMatch = googleMapsUrl.match(/\/place\/([^/@?]+)/);
+    if (placeMatch) {
+      searchQuery = decodeURIComponent(placeMatch[1].replace(/\+/g, " "));
+    }
+    
+    // Format 2: ?q=Place+Name or ?query=Place+Name
+    if (!searchQuery) {
+      try {
+        const url = new URL(googleMapsUrl);
+        searchQuery = url.searchParams.get("q") || url.searchParams.get("query") || "";
+        if (searchQuery) {
+          searchQuery = decodeURIComponent(searchQuery.replace(/\+/g, " "));
+        }
+      } catch {
+        // URL parsing failed, try regex
+      }
+    }
+    
+    // Format 3: search/ followed by place name
+    if (!searchQuery) {
+      const searchMatch = googleMapsUrl.match(/\/search\/([^/@?]+)/);
+      if (searchMatch) {
+        searchQuery = decodeURIComponent(searchMatch[1].replace(/\+/g, " "));
+      }
+    }
+    
+    // Format 4: Extract address-like text from URL path
+    if (!searchQuery) {
+      const addressMatch = googleMapsUrl.match(/\/([^/@]+),\+([^/@]+)/);
+      if (addressMatch) {
+        searchQuery = decodeURIComponent(`${addressMatch[1]} ${addressMatch[2]}`.replace(/\+/g, " "));
+      }
+    }
+    
+    if (!searchQuery) {
+      return { success: false, error: "Could not extract place name from URL. Try copying the full Google Maps link that includes the place name." };
+    }
+    
+    console.log("Extracted search query from URL:", searchQuery);
+    return await lookupPlaceByName(searchQuery);
+  } catch (error) {
+    console.error("Error parsing Google Maps URL:", error);
+    return { success: false, error: "Invalid Google Maps URL format" };
+  }
+}
+
+// Process voice transcript to extract place info
+export async function processVoiceTranscript(transcript: string): Promise<PlaceLookupResult> {
+  if (!transcript || transcript.trim().length === 0) {
+    return { success: false, error: "Voice transcript is empty" };
+  }
+  
+  if (transcript.trim().length < 3) {
+    return { success: false, error: "Voice transcript too short. Please say the name of the place you want to add." };
+  }
+
+  // Use AI to extract place name and context from natural speech
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `You extract place names from spoken descriptions. The user wants to add a destination or place of interest.
+
+Return JSON with exactly this structure:
+{
+  "placeName": "the extracted place name or null if not found",
+  "context": "any location context like city/state, or null",
+  "notes": "any personal notes/comments the user mentioned, or null",
+  "error": "explanation if placeName is null"
+}
+
+Examples:
+- "I want to add Central Park in New York" → {"placeName": "Central Park", "context": "New York", "notes": null}
+- "The zoo we went to last week was great" → {"placeName": null, "error": "No specific place name mentioned - just 'the zoo'"}
+- "Add Turtle Back Zoo, it has great animals for kids" → {"placeName": "Turtle Back Zoo", "context": null, "notes": "great animals for kids"}`
+        },
+        {
+          role: "user",
+          content: `Extract the place information from this voice transcript: "${transcript}"`
+        }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      return { success: false, error: "Failed to process voice input - no response from AI" };
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch (parseError) {
+      console.error("Failed to parse AI response:", content);
+      return { success: false, error: "Failed to parse voice input response" };
+    }
+    
+    // Validate the parsed response
+    if (!parsed.placeName || typeof parsed.placeName !== 'string' || parsed.placeName.trim().length === 0) {
+      return { success: false, error: parsed.error || "Could not identify a place name from your voice input. Please try again with a specific place name." };
+    }
+    
+    console.log("Extracted from voice:", parsed.placeName, parsed.context || "");
+    
+    const result = await lookupPlaceByName(parsed.placeName, parsed.context || undefined);
+    
+    // Add user notes if provided
+    if (result.success && result.place && parsed.notes && typeof parsed.notes === 'string') {
+      result.place.userNotes = parsed.notes.trim();
+    }
+    
+    return result;
+  } catch (error) {
+    console.error("Error processing voice transcript:", error);
+    return { success: false, error: "Failed to process voice input. Please try again." };
+  }
+}
+
+// Helper functions
+function mapGoogleTypeToCategory(types: string[]): string {
+  if (!types || types.length === 0) return "Attraction";
+  
+  const typeMap: Record<string, string> = {
+    "amusement_park": "Theme Park",
+    "zoo": "Zoo",
+    "aquarium": "Aquarium",
+    "museum": "Museum",
+    "park": "Park",
+    "restaurant": "Restaurant",
+    "cafe": "Cafe",
+    "tourist_attraction": "Attraction",
+    "natural_feature": "Nature",
+    "campground": "Outdoor Recreation",
+    "rv_park": "Outdoor Recreation",
+    "stadium": "Entertainment",
+    "bowling_alley": "Entertainment",
+    "movie_theater": "Entertainment",
+  };
+  
+  for (const type of types) {
+    if (typeMap[type]) return typeMap[type];
+  }
+  
+  return "Attraction";
+}
+
+function mapTypesToIndoorOutdoor(types: string[]): string {
+  if (!types) return "both";
+  
+  const outdoorTypes = ["park", "zoo", "campground", "natural_feature", "beach", "hiking_area"];
+  const indoorTypes = ["museum", "movie_theater", "bowling_alley", "shopping_mall", "library"];
+  
+  const hasOutdoor = types.some(t => outdoorTypes.includes(t));
+  const hasIndoor = types.some(t => indoorTypes.includes(t));
+  
+  if (hasOutdoor && hasIndoor) return "both";
+  if (hasOutdoor) return "outdoor";
+  if (hasIndoor) return "indoor";
+  return "both";
+}
+
+function formatParkingInfo(options: any): string {
+  const parts: string[] = [];
+  if (options.freeParking) parts.push("Free parking available");
+  if (options.paidParking) parts.push("Paid parking available");
+  if (options.streetParking) parts.push("Street parking available");
+  if (options.valetParking) parts.push("Valet parking available");
+  if (options.wheelchairAccessibleParking) parts.push("Accessible parking available");
+  return parts.join(". ") || "Parking information not available";
 }
