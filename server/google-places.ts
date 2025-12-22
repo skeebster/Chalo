@@ -306,6 +306,86 @@ async function searchNearbyRestaurants(lat: number, lng: number): Promise<Nearby
   }
 }
 
+// Use AI to research and generate comprehensive place information
+async function researchPlaceWithAI(placeName: string, address: string, googleRating: string | null, category: string): Promise<Partial<InsertPlace>> {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // Use the best model for comprehensive research
+      messages: [
+        {
+          role: "system",
+          content: `You are a travel research expert. Generate comprehensive destination information for families planning weekend trips. 
+          
+Return a JSON object with these fields (all as strings unless noted):
+{
+  "overview": "2-3 sentence engaging description of the place",
+  "subcategory": "specific type of attraction",
+  "keyHighlights": "4-5 main attractions or features, semicolon separated",
+  "insiderTips": "3-4 practical tips for visitors, written as advice",
+  "entryFee": "typical admission costs or 'Free'",
+  "averageSpend": <number, estimated total spend for family of 4>,
+  "bestSeasons": "best times of year to visit",
+  "bestDay": "best day of week and why",
+  "bestTimeOfDay": "optimal arrival time",
+  "parkingInfo": "parking situation and costs",
+  "evCharging": "EV charging availability nearby",
+  "overallSentiment": "1 sentence summary of visitor sentiment",
+  "nearbyRestaurants": [{"name": "Restaurant Name", "description": "brief description", "distance": "X mi"}],
+  "averageVisitDuration": "typical time spent",
+  "kidFriendly": <boolean>,
+  "indoorOutdoor": "indoor" or "outdoor" or "both"
+}
+
+Be specific and accurate. If unsure about something, provide reasonable estimates based on similar venues.`
+        },
+        {
+          role: "user",
+          content: `Research this destination for a family weekend trip:
+
+Name: ${placeName}
+Address: ${address}
+Category: ${category}
+Google Rating: ${googleRating || "Unknown"}
+
+Provide comprehensive, practical information for families planning to visit.`
+        }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.7,
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      console.error("No AI response for place research");
+      return {};
+    }
+
+    const research = JSON.parse(content);
+    
+    return {
+      overview: research.overview || null,
+      subcategory: research.subcategory || null,
+      keyHighlights: research.keyHighlights || null,
+      insiderTips: research.insiderTips || null,
+      entryFee: research.entryFee || null,
+      averageSpend: typeof research.averageSpend === 'number' ? research.averageSpend : null,
+      bestSeasons: research.bestSeasons || null,
+      bestDay: research.bestDay || null,
+      bestTimeOfDay: research.bestTimeOfDay || "Early morning for smaller crowds",
+      parkingInfo: research.parkingInfo || null,
+      evCharging: research.evCharging || null,
+      overallSentiment: research.overallSentiment || null,
+      nearbyRestaurants: Array.isArray(research.nearbyRestaurants) ? research.nearbyRestaurants : [],
+      averageVisitDuration: research.averageVisitDuration || null,
+      kidFriendly: typeof research.kidFriendly === 'boolean' ? research.kidFriendly : true,
+      indoorOutdoor: research.indoorOutdoor || "both",
+    };
+  } catch (error) {
+    console.error("Error researching place with AI:", error);
+    return {};
+  }
+}
+
 // Lookup a place by name and get full details for card creation
 export async function lookupPlaceByName(placeName: string, additionalContext?: string): Promise<PlaceLookupResult> {
   if (!placeName || placeName.trim().length === 0) {
@@ -325,28 +405,37 @@ export async function lookupPlaceByName(placeName: string, additionalContext?: s
     return { success: false, error: `Could not fetch details for: ${placeName}` };
   }
   
-  // Map Google Places data to our schema with required field defaults
+  const name = details.displayName?.text || placeName;
+  const address = details.formattedAddress || "";
+  const googleRating = details.rating?.toString() || null;
+  const category = details.primaryTypeDisplayName?.text || mapGoogleTypeToCategory(details.types) || "Attraction";
+  
+  // Use AI to research comprehensive details
+  console.log("Researching comprehensive details for:", name);
+  const aiResearch = await researchPlaceWithAI(name, address, googleRating, category);
+  
+  // Map Google Places data to our schema with AI-enhanced content
   const place: Partial<InsertPlace> = {
-    name: details.displayName?.text || placeName,
-    address: details.formattedAddress || null,
+    name,
+    address: address || null,
     googleMapsUrl: details.googleMapsUri || googleMapsUrl || null,
-    googleRating: details.rating?.toString() || null,
-    overview: details.editorialSummary?.text || `A destination found via Google Places.`,
-    category: details.primaryTypeDisplayName?.text || mapGoogleTypeToCategory(details.types) || "Attraction",
-    subcategory: null,
-    keyHighlights: null,
-    insiderTips: null,
-    entryFee: null,
-    averageSpend: null,
-    bestSeasons: null,
-    bestDay: null,
-    bestTimeOfDay: "Early morning (9-11am) for smaller crowds",
-    parkingInfo: details.parkingOptions ? formatParkingInfo(details.parkingOptions) : null,
-    evCharging: null,
+    googleRating,
+    overview: aiResearch.overview || details.editorialSummary?.text || `A destination to explore.`,
+    category,
+    subcategory: aiResearch.subcategory || null,
+    keyHighlights: aiResearch.keyHighlights || null,
+    insiderTips: aiResearch.insiderTips || null,
+    entryFee: aiResearch.entryFee || null,
+    averageSpend: aiResearch.averageSpend || null,
+    bestSeasons: aiResearch.bestSeasons || null,
+    bestDay: aiResearch.bestDay || null,
+    bestTimeOfDay: aiResearch.bestTimeOfDay || "Early morning (9-11am) for smaller crowds",
+    parkingInfo: aiResearch.parkingInfo || (details.parkingOptions ? formatParkingInfo(details.parkingOptions) : null),
+    evCharging: aiResearch.evCharging || null,
     tripadvisorRating: null,
-    overallSentiment: null,
-    nearbyRestaurants: [],
-    averageVisitDuration: null,
+    overallSentiment: aiResearch.overallSentiment || null,
+    nearbyRestaurants: aiResearch.nearbyRestaurants || [],
+    averageVisitDuration: aiResearch.averageVisitDuration || null,
     upcomingEvents: null,
     researchSources: null,
     wheelchairAccessible: details.accessibilityOptions?.wheelchairAccessibleEntrance || 
@@ -355,8 +444,8 @@ export async function lookupPlaceByName(placeName: string, additionalContext?: s
     serviceAnimalsAllowed: true,
     accessibilityNotes: "Contact venue for specific accessibility needs.",
     publicTransit: null,
-    kidFriendly: true,
-    indoorOutdoor: mapTypesToIndoorOutdoor(details.types) || "both",
+    kidFriendly: aiResearch.kidFriendly ?? true,
+    indoorOutdoor: aiResearch.indoorOutdoor || mapTypesToIndoorOutdoor(details.types) || "both",
     visited: false,
     visitedDate: null,
     userNotes: null,
