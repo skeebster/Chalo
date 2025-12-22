@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { MapPin, Calendar, Clock, DollarSign, ExternalLink, ThumbsUp, Car, Info, Lightbulb, Star, Utensils, Zap, ParkingCircle, Sun, CheckCircle2, MessageCircle, TrendingUp, User } from "lucide-react";
+import { MapPin, Calendar, Clock, DollarSign, ExternalLink, ThumbsUp, ThumbsDown, Car, Info, Lightbulb, Star, Utensils, Zap, ParkingCircle, Sun, CheckCircle2, MessageCircle, TrendingUp, Sparkles, AlertCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 interface PlaceDetailProps {
@@ -16,19 +15,21 @@ interface PlaceDetailProps {
   onOpenChange: (open: boolean) => void;
 }
 
-interface GoogleReview {
-  author_name: string;
-  rating: number;
-  relative_time_description: string;
-  text?: string;
-  profile_photo_url?: string;
+interface ReviewInsight {
+  sentimentScore: number;
+  sentimentLabel: string;
+  summary: string;
+  pros: string[];
+  cons: string[];
+  visitorTips: string[];
+  noteworthyMentions: string[];
 }
 
-interface GoogleReviewsData {
+interface ReviewAnalysis {
   rating: number | null;
   totalReviews: number | null;
-  reviews: GoogleReview[];
-  popularItems: string[];
+  insights: ReviewInsight | null;
+  googleMapsUrl: string | null;
 }
 
 function parseTextToBullets(text: string): string[] {
@@ -87,21 +88,24 @@ function extractFoodItems(description: string): string[] {
   return items.slice(0, 3);
 }
 
-function renderStars(rating: number) {
-  const stars = [];
-  for (let i = 1; i <= 5; i++) {
-    stars.push(
-      <Star 
-        key={i} 
-        className={`w-4 h-4 ${i <= rating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'}`} 
-      />
-    );
-  }
-  return <div className="flex gap-0.5">{stars}</div>;
+function getSentimentColor(score: number): string {
+  if (score >= 80) return "text-green-400";
+  if (score >= 60) return "text-lime-400";
+  if (score >= 40) return "text-yellow-400";
+  if (score >= 20) return "text-orange-400";
+  return "text-red-400";
+}
+
+function getSentimentBgColor(score: number): string {
+  if (score >= 80) return "bg-green-500/20 border-green-500/30";
+  if (score >= 60) return "bg-lime-500/20 border-lime-500/30";
+  if (score >= 40) return "bg-yellow-500/20 border-yellow-500/30";
+  if (score >= 20) return "bg-orange-500/20 border-orange-500/30";
+  return "bg-red-500/20 border-red-500/30";
 }
 
 export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
-  const { data: reviewsData, isLoading: reviewsLoading } = useQuery<GoogleReviewsData>({
+  const { data: reviewData, isLoading: reviewsLoading } = useQuery<ReviewAnalysis>({
     queryKey: ['/api/places', place?.id, 'reviews'],
     enabled: open && !!place?.id,
   });
@@ -147,29 +151,141 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
               <StatBox 
                 icon={Star} 
                 label="Rating" 
-                value={reviewsData?.rating?.toFixed(1) || place.googleRating?.toString() || '--'} 
-                subValue={reviewsData?.totalReviews ? `(${reviewsData.totalReviews.toLocaleString()})` : undefined}
+                value={reviewData?.rating?.toFixed(1) || place.googleRating?.toString() || '--'} 
+                subValue={reviewData?.totalReviews ? `(${reviewData.totalReviews.toLocaleString()})` : undefined}
               />
             </div>
 
-            {/* Popular Items from Reviews */}
-            {reviewsData?.popularItems && reviewsData.popularItems.length > 0 && (
+            {/* AI-Powered Visitor Insights */}
+            {reviewsLoading ? (
+              <section>
+                <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-primary" /> Visitor Insights
+                </h3>
+                <div className="bg-white/5 p-4 rounded-xl border border-white/5 space-y-4">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                </div>
+              </section>
+            ) : reviewData?.insights ? (
               <>
                 <section>
                   <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-primary" /> Popular from Reviews
+                    <Sparkles className="w-5 h-5 text-primary" /> Visitor Insights
+                    <Badge variant="outline" className="text-xs ml-2 text-muted-foreground border-muted-foreground/30">
+                      AI-analyzed from {reviewData.totalReviews?.toLocaleString() || 'multiple'} reviews
+                    </Badge>
                   </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {reviewsData.popularItems.map((item, i) => (
-                      <Badge key={i} className="bg-green-500/20 text-green-400 border-green-500/30 text-sm py-1.5 px-3">
-                        {item}
-                      </Badge>
-                    ))}
+                  
+                  {/* Sentiment Score */}
+                  <div className={`p-4 rounded-xl border mb-4 ${getSentimentBgColor(reviewData.insights.sentimentScore)}`}>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`text-3xl font-bold ${getSentimentColor(reviewData.insights.sentimentScore)}`}>
+                        {reviewData.insights.sentimentScore}
+                      </div>
+                      <div>
+                        <div className={`font-semibold ${getSentimentColor(reviewData.insights.sentimentScore)}`}>
+                          {reviewData.insights.sentimentLabel}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Overall Visitor Sentiment</div>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {reviewData.insights.summary}
+                    </p>
                   </div>
+
+                  {/* Pros and Cons */}
+                  <div className="grid md:grid-cols-2 gap-4 mb-4">
+                    {reviewData.insights.pros.length > 0 && (
+                      <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-xl">
+                        <div className="flex items-center gap-2 mb-3">
+                          <ThumbsUp className="w-4 h-4 text-green-400" />
+                          <span className="font-semibold text-green-400 text-sm">What Visitors Love</span>
+                        </div>
+                        <ul className="space-y-2">
+                          {reviewData.insights.pros.map((pro, i) => (
+                            <li key={i} className="flex gap-2 text-sm text-muted-foreground">
+                              <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
+                              <span>{pro}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {reviewData.insights.cons.length > 0 && (
+                      <div className="bg-orange-500/10 border border-orange-500/20 p-4 rounded-xl">
+                        <div className="flex items-center gap-2 mb-3">
+                          <ThumbsDown className="w-4 h-4 text-orange-400" />
+                          <span className="font-semibold text-orange-400 text-sm">Things to Consider</span>
+                        </div>
+                        <ul className="space-y-2">
+                          {reviewData.insights.cons.map((con, i) => (
+                            <li key={i} className="flex gap-2 text-sm text-muted-foreground">
+                              <AlertCircle className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
+                              <span>{con}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Noteworthy Mentions */}
+                  {reviewData.insights.noteworthyMentions.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-medium text-white">Worth Checking Out</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {reviewData.insights.noteworthyMentions.map((item, i) => (
+                          <Badge key={i} className="bg-primary/20 text-primary border-primary/30 text-sm py-1.5 px-3">
+                            {item}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Visitor Tips from Reviews */}
+                  {reviewData.insights.visitorTips.length > 0 && (
+                    <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Lightbulb className="w-4 h-4 text-blue-400" />
+                        <span className="font-semibold text-blue-400 text-sm">Tips from Recent Visitors</span>
+                      </div>
+                      <ul className="space-y-2">
+                        {reviewData.insights.visitorTips.map((tip, i) => (
+                          <li key={i} className="flex gap-2 text-sm text-muted-foreground">
+                            <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                            <span>{tip}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Link to Google Reviews */}
+                  {reviewData.googleMapsUrl && (
+                    <div className="mt-3 text-center">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-muted-foreground gap-2"
+                        onClick={() => window.open(reviewData.googleMapsUrl!, '_blank')}
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        Read all reviews on Google
+                        <ExternalLink className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  )}
                 </section>
                 <Separator className="bg-white/10" />
               </>
-            )}
+            ) : null}
 
             {/* Overview */}
             <section>
@@ -297,66 +413,8 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
               </>
             )}
 
-            {/* Google Reviews Section */}
-            <Separator className="bg-white/10" />
-            <section>
-              <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                <MessageCircle className="w-5 h-5 text-primary" /> Recent Google Reviews
-              </h3>
-              
-              {reviewsLoading ? (
-                <div className="space-y-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-white/5 p-4 rounded-xl border border-white/5">
-                      <div className="flex items-start gap-3">
-                        <Skeleton className="w-10 h-10 rounded-full" />
-                        <div className="flex-1 space-y-2">
-                          <Skeleton className="h-4 w-24" />
-                          <Skeleton className="h-3 w-16" />
-                          <Skeleton className="h-12 w-full" />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : reviewsData?.reviews && reviewsData.reviews.length > 0 ? (
-                <div className="space-y-4">
-                  {reviewsData.reviews.map((review, i) => (
-                    <div key={i} className="bg-white/5 p-4 rounded-xl border border-white/5">
-                      <div className="flex items-start gap-3">
-                        <Avatar className="w-10 h-10">
-                          {review.profile_photo_url ? (
-                            <AvatarImage src={review.profile_photo_url} alt={review.author_name} />
-                          ) : null}
-                          <AvatarFallback className="bg-primary/20 text-primary">
-                            <User className="w-5 h-5" />
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-white text-sm">{review.author_name}</span>
-                            <span className="text-xs text-muted-foreground">{review.relative_time_description}</span>
-                          </div>
-                          <div className="mt-1 mb-2">
-                            {renderStars(review.rating)}
-                          </div>
-                          {review.text && (
-                            <p className="text-sm text-muted-foreground leading-relaxed">{review.text}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="bg-white/5 p-4 rounded-xl border border-white/5 text-center">
-                  <p className="text-sm text-muted-foreground">No recent reviews available.</p>
-                </div>
-              )}
-            </section>
-
-            {/* Overall Sentiment (fallback when no live reviews) */}
-            {place.overallSentiment && (!reviewsData?.reviews || reviewsData.reviews.length === 0) && (
+            {/* Fallback Overall Sentiment (when no AI insights) */}
+            {place.overallSentiment && !reviewData?.insights && !reviewsLoading && (
               <>
                 <Separator className="bg-white/10" />
                 <section>

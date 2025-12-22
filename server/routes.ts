@@ -7,7 +7,7 @@ import OpenAI from "openai";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
-import { getPlaceReviews } from "./google-places";
+import { getReviewAnalysis } from "./google-places";
 
 // Sample data for import - from CSV with real images
 const samplePlaces = [
@@ -708,7 +708,7 @@ export async function registerRoutes(
     }
   });
 
-  // === Google Places Reviews API ===
+  // === Google Places Review Analysis API ===
   app.get("/api/places/:id/reviews", async (req, res) => {
     try {
       const place = await storage.getPlace(Number(req.params.id));
@@ -716,11 +716,11 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Place not found" });
       }
 
-      const reviews = await getPlaceReviews(place.name, place.address || undefined);
-      res.json(reviews);
+      const analysis = await getReviewAnalysis(place.name, place.address || undefined);
+      res.json(analysis);
     } catch (error) {
-      console.error("Error fetching Google reviews:", error);
-      res.status(500).json({ message: "Failed to fetch reviews" });
+      console.error("Error fetching review analysis:", error);
+      res.status(500).json({ message: "Failed to analyze reviews" });
     }
   });
 
