@@ -188,8 +188,10 @@ export function AddPlaceModal({ open, onOpenChange, onSuccess }: Props) {
       setUrlStatus('complete');
       queryClient.invalidateQueries({ queryKey: ['/api/places'] });
       toast({
-        title: "Place added",
-        description: `${data.place.name} has been added to your places.`,
+        title: data.merged ? "Place updated" : "Place added",
+        description: data.merged 
+          ? `${data.place.name} already existed and has been updated with new information.`
+          : `${data.place.name} has been added to your places.`,
       });
       setTimeout(() => {
         onSuccess();
@@ -234,8 +236,10 @@ export function AddPlaceModal({ open, onOpenChange, onSuccess }: Props) {
       setVoiceStatus('complete');
       queryClient.invalidateQueries({ queryKey: ['/api/places'] });
       toast({
-        title: "Place added",
-        description: `${data.place.name} has been added to your places.`,
+        title: data.merged ? "Place updated" : "Place added",
+        description: data.merged 
+          ? `${data.place.name} already existed and has been updated with new information.`
+          : `${data.place.name} has been added to your places.`,
       });
       setTimeout(() => {
         onSuccess();

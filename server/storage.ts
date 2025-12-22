@@ -26,6 +26,7 @@ export interface IStorage {
   // Places
   getPlaces(filters?: PlaceFilterOptions): Promise<Place[]>;
   getPlace(id: number): Promise<Place | undefined>;
+  findPlaceByName(name: string): Promise<Place | undefined>;
   createPlace(place: InsertPlace): Promise<Place>;
   updatePlace(id: number, updates: UpdatePlaceRequest): Promise<Place>;
   deletePlace(id: number): Promise<void>;
@@ -117,6 +118,14 @@ export class DatabaseStorage implements IStorage {
 
   async getPlace(id: number): Promise<Place | undefined> {
     const [place] = await db.select().from(places).where(eq(places.id, id));
+    return place;
+  }
+
+  async findPlaceByName(name: string): Promise<Place | undefined> {
+    // Use case-insensitive search to find duplicates
+    const [place] = await db.select().from(places).where(
+      ilike(places.name, name.trim())
+    );
     return place;
   }
 

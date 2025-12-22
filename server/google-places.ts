@@ -309,6 +309,10 @@ async function searchNearbyRestaurants(lat: number, lng: number): Promise<Nearby
 // Use AI to research and generate comprehensive place information
 async function researchPlaceWithAI(placeName: string, address: string, googleRating: string | null, category: string): Promise<Partial<InsertPlace>> {
   try {
+    // Generate search URLs for source attribution
+    const encodedName = encodeURIComponent(placeName);
+    const encodedAddress = encodeURIComponent(address);
+    
     const response = await openai.chat.completions.create({
       model: "gpt-4o", // Use the best model for comprehensive research
       messages: [
@@ -333,7 +337,8 @@ Return a JSON object with these fields (all as strings unless noted):
   "nearbyRestaurants": [{"name": "Restaurant Name", "description": "brief description", "distance": "X mi"}],
   "averageVisitDuration": "typical time spent",
   "kidFriendly": <boolean>,
-  "indoorOutdoor": "indoor" or "outdoor" or "both"
+  "indoorOutdoor": "indoor" or "outdoor" or "both",
+  "officialWebsite": "official website URL if known, or null"
 }
 
 Be specific and accurate. If unsure about something, provide reasonable estimates based on similar venues.`
@@ -362,6 +367,15 @@ Provide comprehensive, practical information for families planning to visit.`
 
     const research = JSON.parse(content);
     
+    // Build research sources with hyperlinks
+    const sources: string[] = [];
+    if (research.officialWebsite) {
+      sources.push(`Official Website: ${research.officialWebsite}`);
+    }
+    sources.push(`Google Maps: https://www.google.com/maps/search/?api=1&query=${encodedName}+${encodedAddress}`);
+    sources.push(`TripAdvisor: https://www.tripadvisor.com/Search?q=${encodedName}`);
+    sources.push(`Yelp: https://www.yelp.com/search?find_desc=${encodedName}&find_loc=${encodedAddress}`);
+    
     return {
       overview: research.overview || null,
       subcategory: research.subcategory || null,
@@ -379,6 +393,7 @@ Provide comprehensive, practical information for families planning to visit.`
       averageVisitDuration: research.averageVisitDuration || null,
       kidFriendly: typeof research.kidFriendly === 'boolean' ? research.kidFriendly : true,
       indoorOutdoor: research.indoorOutdoor || "both",
+      researchSources: sources.join(" | "),
     };
   } catch (error) {
     console.error("Error researching place with AI:", error);

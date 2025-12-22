@@ -8,7 +8,66 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
 import { getReviewAnalysis, lookupPlaceFromUrl, lookupPlaceByName, processVoiceTranscript } from "./google-places";
-import type { InsertPlace } from "@shared/schema";
+import type { InsertPlace, Place, UpdatePlaceRequest } from "@shared/schema";
+
+// Fields to always preserve from existing (user-generated data)
+const PRESERVE_FIELDS = ['userNotes', 'visited', 'visitedDate', 'imageUrl', 'id', 'createdAt', 'updatedAt'];
+
+// Helper to merge raw (no defaults applied) place data with existing place
+// Only FILLS IN missing data - never overwrites existing non-empty values
+function mergeRawWithExisting(existing: Place, rawData: Partial<InsertPlace>): Partial<UpdatePlaceRequest> {
+  const updates: Partial<UpdatePlaceRequest> = {};
+  
+  for (const [key, value] of Object.entries(rawData)) {
+    // Skip fields that should be preserved from existing
+    if (PRESERVE_FIELDS.includes(key)) {
+      continue;
+    }
+    
+    // Skip null/undefined values from new data
+    if (value === null || value === undefined) {
+      continue;
+    }
+    
+    // Skip empty strings from new data
+    if (typeof value === 'string' && value.trim().length === 0) {
+      continue;
+    }
+    
+    // Skip empty arrays from new data
+    if (Array.isArray(value) && value.length === 0) {
+      continue;
+    }
+    
+    // Check if existing has a value - if so, DON'T overwrite it
+    const existingValue = (existing as any)[key];
+    
+    // Keep existing strings that are non-empty
+    if (typeof existingValue === 'string' && existingValue.trim().length > 0) {
+      continue;
+    }
+    
+    // Keep existing arrays that are non-empty
+    if (Array.isArray(existingValue) && existingValue.length > 0) {
+      continue;
+    }
+    
+    // Keep existing numbers that are set
+    if (typeof existingValue === 'number') {
+      continue;
+    }
+    
+    // Keep existing booleans (they're intentionally set)
+    if (typeof existingValue === 'boolean') {
+      continue;
+    }
+    
+    // Existing value is null/undefined/empty - fill with new value
+    (updates as any)[key] = value;
+  }
+  
+  return updates;
+}
 
 // Helper to validate and fill required fields for place creation
 function validateAndFillPlace(partialPlace: Partial<InsertPlace>): InsertPlace | null {
@@ -851,16 +910,30 @@ export async function registerRoutes(
         return res.status(400).json({ success: false, error: result.error || "Failed to lookup place" });
       }
       
-      // Validate and fill required fields
-      const validatedPlace = validateAndFillPlace(result.place);
+      const rawPlace = result.place;
+      
+      // Check name exists
+      if (!rawPlace.name || rawPlace.name.trim().length === 0) {
+        return res.status(400).json({ success: false, error: "Could not determine place name from URL" });
+      }
+      
+      // Check for duplicates BEFORE applying defaults
+      const existingPlace = await storage.findPlaceByName(rawPlace.name.trim());
+      if (existingPlace) {
+        // Merge only the raw data (no defaults) with existing
+        const mergedUpdates = mergeRawWithExisting(existingPlace, rawPlace);
+        const updatedPlace = await storage.updatePlace(existingPlace.id, mergedUpdates);
+        return res.json({ success: true, place: updatedPlace, merged: true, message: "Updated existing place with new information" });
+      }
+      
+      // No duplicate - apply defaults and create new
+      const validatedPlace = validateAndFillPlace(rawPlace);
       if (!validatedPlace) {
         return res.status(400).json({ success: false, error: "Could not determine place name from URL" });
       }
       
-      // Create the place in database
       const place = await storage.createPlace(validatedPlace);
-      
-      res.json({ success: true, place });
+      res.json({ success: true, place, merged: false });
     } catch (error) {
       console.error("Import URL error:", error);
       res.status(500).json({ success: false, error: "Failed to import from URL" });
@@ -882,16 +955,30 @@ export async function registerRoutes(
         return res.status(400).json({ success: false, error: result.error || "Failed to process voice input" });
       }
       
-      // Validate and fill required fields
-      const validatedPlace = validateAndFillPlace(result.place);
+      const rawPlace = result.place;
+      
+      // Check name exists
+      if (!rawPlace.name || rawPlace.name.trim().length === 0) {
+        return res.status(400).json({ success: false, error: "Could not determine place name from voice input" });
+      }
+      
+      // Check for duplicates BEFORE applying defaults
+      const existingPlace = await storage.findPlaceByName(rawPlace.name.trim());
+      if (existingPlace) {
+        // Merge only the raw data (no defaults) with existing
+        const mergedUpdates = mergeRawWithExisting(existingPlace, rawPlace);
+        const updatedPlace = await storage.updatePlace(existingPlace.id, mergedUpdates);
+        return res.json({ success: true, place: updatedPlace, merged: true, message: "Updated existing place with new information" });
+      }
+      
+      // No duplicate - apply defaults and create new
+      const validatedPlace = validateAndFillPlace(rawPlace);
       if (!validatedPlace) {
         return res.status(400).json({ success: false, error: "Could not determine place name from voice input" });
       }
       
-      // Create the place in database
       const place = await storage.createPlace(validatedPlace);
-      
-      res.json({ success: true, place });
+      res.json({ success: true, place, merged: false });
     } catch (error) {
       console.error("Import voice error:", error);
       res.status(500).json({ success: false, error: "Failed to import from voice" });
