@@ -7,6 +7,7 @@ import OpenAI from "openai";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
+import { getPlaceReviews } from "./google-places";
 
 // Sample data for import - from CSV with real images
 const samplePlaces = [
@@ -704,6 +705,22 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Import error:", error);
       res.status(500).json({ success: false, count: 0 });
+    }
+  });
+
+  // === Google Places Reviews API ===
+  app.get("/api/places/:id/reviews", async (req, res) => {
+    try {
+      const place = await storage.getPlace(Number(req.params.id));
+      if (!place) {
+        return res.status(404).json({ message: "Place not found" });
+      }
+
+      const reviews = await getPlaceReviews(place.name, place.address || undefined);
+      res.json(reviews);
+    } catch (error) {
+      console.error("Error fetching Google reviews:", error);
+      res.status(500).json({ message: "Failed to fetch reviews" });
     }
   });
 

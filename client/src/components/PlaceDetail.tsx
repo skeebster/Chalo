@@ -1,15 +1,34 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Place } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { MapPin, Calendar, Clock, DollarSign, ExternalLink, ThumbsUp, Car, Info, Lightbulb, Star, Utensils, Zap, ParkingCircle, Sun, CheckCircle2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { MapPin, Calendar, Clock, DollarSign, ExternalLink, ThumbsUp, Car, Info, Lightbulb, Star, Utensils, Zap, ParkingCircle, Sun, CheckCircle2, MessageCircle, TrendingUp, User } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 interface PlaceDetailProps {
   place: Place | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+interface GoogleReview {
+  author_name: string;
+  rating: number;
+  relative_time_description: string;
+  text?: string;
+  profile_photo_url?: string;
+}
+
+interface GoogleReviewsData {
+  rating: number | null;
+  totalReviews: number | null;
+  reviews: GoogleReview[];
+  popularItems: string[];
 }
 
 function parseTextToBullets(text: string): string[] {
@@ -68,12 +87,33 @@ function extractFoodItems(description: string): string[] {
   return items.slice(0, 3);
 }
 
+function renderStars(rating: number) {
+  const stars = [];
+  for (let i = 1; i <= 5; i++) {
+    stars.push(
+      <Star 
+        key={i} 
+        className={`w-4 h-4 ${i <= rating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'}`} 
+      />
+    );
+  }
+  return <div className="flex gap-0.5">{stars}</div>;
+}
+
 export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
+  const { data: reviewsData, isLoading: reviewsLoading } = useQuery<GoogleReviewsData>({
+    queryKey: ['/api/places', place?.id, 'reviews'],
+    enabled: open && !!place?.id,
+  });
+
   if (!place) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl h-[85vh] p-0 overflow-hidden bg-card border-white/10">
+      <DialogContent className="max-w-3xl h-[85vh] p-0 overflow-hidden bg-card border-white/10" aria-describedby={undefined}>
+        <VisuallyHidden>
+          <DialogTitle>{place.name}</DialogTitle>
+        </VisuallyHidden>
         <div className="relative h-64 w-full shrink-0">
           <img 
             src={place.imageUrl || "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&auto=format&fit=crop&q=60"} 
@@ -104,8 +144,32 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
               <StatBox icon={Clock} label="Drive Time" value={`${place.driveTimeMinutes || '--'} min`} />
               <StatBox icon={Car} label="Distance" value={`${place.distanceMiles || '--'} mi`} />
               <StatBox icon={DollarSign} label="Avg Spend" value={`$${place.averageSpend || '--'}`} />
-              <StatBox icon={ThumbsUp} label="Rating" value={place.googleRating?.toString() || '--'} />
+              <StatBox 
+                icon={Star} 
+                label="Rating" 
+                value={reviewsData?.rating?.toFixed(1) || place.googleRating?.toString() || '--'} 
+                subValue={reviewsData?.totalReviews ? `(${reviewsData.totalReviews.toLocaleString()})` : undefined}
+              />
             </div>
+
+            {/* Popular Items from Reviews */}
+            {reviewsData?.popularItems && reviewsData.popularItems.length > 0 && (
+              <>
+                <section>
+                  <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-primary" /> Popular from Reviews
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {reviewsData.popularItems.map((item, i) => (
+                      <Badge key={i} className="bg-green-500/20 text-green-400 border-green-500/30 text-sm py-1.5 px-3">
+                        {item}
+                      </Badge>
+                    ))}
+                  </div>
+                </section>
+                <Separator className="bg-white/10" />
+              </>
+            )}
 
             {/* Overview */}
             <section>
@@ -233,8 +297,66 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
               </>
             )}
 
-            {/* Overall Sentiment */}
-            {place.overallSentiment && (
+            {/* Google Reviews Section */}
+            <Separator className="bg-white/10" />
+            <section>
+              <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                <MessageCircle className="w-5 h-5 text-primary" /> Recent Google Reviews
+              </h3>
+              
+              {reviewsLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="bg-white/5 p-4 rounded-xl border border-white/5">
+                      <div className="flex items-start gap-3">
+                        <Skeleton className="w-10 h-10 rounded-full" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-3 w-16" />
+                          <Skeleton className="h-12 w-full" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : reviewsData?.reviews && reviewsData.reviews.length > 0 ? (
+                <div className="space-y-4">
+                  {reviewsData.reviews.map((review, i) => (
+                    <div key={i} className="bg-white/5 p-4 rounded-xl border border-white/5">
+                      <div className="flex items-start gap-3">
+                        <Avatar className="w-10 h-10">
+                          {review.profile_photo_url ? (
+                            <AvatarImage src={review.profile_photo_url} alt={review.author_name} />
+                          ) : null}
+                          <AvatarFallback className="bg-primary/20 text-primary">
+                            <User className="w-5 h-5" />
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-white text-sm">{review.author_name}</span>
+                            <span className="text-xs text-muted-foreground">{review.relative_time_description}</span>
+                          </div>
+                          <div className="mt-1 mb-2">
+                            {renderStars(review.rating)}
+                          </div>
+                          {review.text && (
+                            <p className="text-sm text-muted-foreground leading-relaxed">{review.text}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white/5 p-4 rounded-xl border border-white/5 text-center">
+                  <p className="text-sm text-muted-foreground">No recent reviews available.</p>
+                </div>
+              )}
+            </section>
+
+            {/* Overall Sentiment (fallback when no live reviews) */}
+            {place.overallSentiment && (!reviewsData?.reviews || reviewsData.reviews.length === 0) && (
               <>
                 <Separator className="bg-white/10" />
                 <section>
@@ -256,7 +378,6 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
                   Open in Maps
                 </Button>
               )}
-              {/* Future feature: Add to Plan */}
               <Button className="gap-2">
                 <Calendar className="w-4 h-4" />
                 Add to Plan
@@ -269,12 +390,13 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
   );
 }
 
-function StatBox({ icon: Icon, label, value }: { icon: any, label: string, value: string }) {
+function StatBox({ icon: Icon, label, value, subValue }: { icon: any, label: string, value: string, subValue?: string }) {
   return (
     <div className="bg-white/5 border border-white/5 p-3 rounded-xl flex flex-col items-center justify-center text-center">
       <Icon className="w-5 h-5 text-primary mb-1" />
       <span className="text-xs text-muted-foreground uppercase tracking-wider">{label}</span>
       <span className="font-bold text-white">{value}</span>
+      {subValue && <span className="text-xs text-muted-foreground">{subValue}</span>}
     </div>
   );
 }
