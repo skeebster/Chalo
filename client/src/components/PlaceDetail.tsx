@@ -35,6 +35,39 @@ function parseHighlights(text: string): string[] {
   return text.split(/[;,]/).map(item => item.trim()).filter(item => item.length > 0);
 }
 
+function extractFoodItems(description: string): string[] {
+  if (!description) return [];
+  
+  const foodKeywords = [
+    'burger', 'burgers', 'pizza', 'pancakes', 'breakfast', 'sandwiches', 'tacos', 
+    'burritos', 'wings', 'chicken', 'seafood', 'sushi', 'pasta', 'steak', 'salads',
+    'soup', 'dessert', 'ice cream', 'coffee', 'chai', 'smoothies', 'fries', 'crabfries',
+    'wraps', 'bowls', 'nuggets', 'ribs', 'bbq', 'mexican', 'italian', 'indian',
+    'chinese', 'thai', 'japanese', 'comfort food', 'brunch', 'deli', 'bakery'
+  ];
+  
+  const items: string[] = [];
+  const lowerDesc = description.toLowerCase();
+  
+  const knownForMatch = description.match(/(?:known for|famous for|best|specializes in|serving|offers?)\s+([^,.$]+)/i);
+  if (knownForMatch) {
+    const found = knownForMatch[1].trim();
+    if (found.length > 3 && found.length < 40) {
+      items.push(found.charAt(0).toUpperCase() + found.slice(1));
+    }
+  }
+  
+  for (const keyword of foodKeywords) {
+    if (lowerDesc.includes(keyword) && !items.some(i => i.toLowerCase().includes(keyword))) {
+      if (items.length < 3) {
+        items.push(keyword.charAt(0).toUpperCase() + keyword.slice(1));
+      }
+    }
+  }
+  
+  return items.slice(0, 3);
+}
+
 export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
   if (!place) return null;
 
@@ -157,22 +190,44 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
                     <Utensils className="w-5 h-5 text-primary" /> Nearby Restaurants
                   </h3>
                   <div className="grid gap-3">
-                    {place.nearbyRestaurants.map((restaurant, i) => (
-                      <div key={i} className="flex items-start gap-3 bg-white/5 p-3 rounded-lg border border-white/5">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                          <Utensils className="w-4 h-4 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <span className="font-medium text-white text-sm block">{restaurant.name}</span>
-                          {restaurant.description && (
-                            <span className="text-xs text-muted-foreground">{restaurant.description}</span>
+                    {place.nearbyRestaurants.map((restaurant, i) => {
+                      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurant.name + (place.address ? ' near ' + place.address : ''))}`;
+                      const foodItems = extractFoodItems(restaurant.description || '');
+                      
+                      return (
+                        <div 
+                          key={i} 
+                          className="flex items-start gap-3 bg-white/5 p-3 rounded-lg border border-white/5 hover-elevate cursor-pointer"
+                          onClick={() => window.open(mapsUrl, '_blank')}
+                          data-testid={`restaurant-card-${i}`}
+                        >
+                          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                            <Utensils className="w-4 h-4 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-white text-sm">{restaurant.name}</span>
+                              <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                            </div>
+                            {restaurant.description && (
+                              <span className="text-xs text-muted-foreground block mt-0.5">{restaurant.description}</span>
+                            )}
+                            {foodItems.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                {foodItems.map((food, j) => (
+                                  <Badge key={j} variant="outline" className="text-xs bg-primary/10 border-primary/20 text-primary">
+                                    {food}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          {restaurant.distance && (
+                            <Badge variant="secondary" className="text-xs shrink-0">{restaurant.distance}</Badge>
                           )}
                         </div>
-                        {restaurant.distance && (
-                          <Badge variant="outline" className="text-xs shrink-0">{restaurant.distance}</Badge>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </section>
               </>
