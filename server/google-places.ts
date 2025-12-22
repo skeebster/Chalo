@@ -378,11 +378,33 @@ export async function lookupPlaceFromUrl(googleMapsUrl: string): Promise<PlaceLo
 
   // Validate it looks like a Google Maps URL
   const lowerUrl = googleMapsUrl.toLowerCase();
-  if (!lowerUrl.includes("google.com/maps") && 
-      !lowerUrl.includes("maps.google.com") && 
-      !lowerUrl.includes("goo.gl/maps") &&
-      !lowerUrl.includes("maps.app.goo.gl")) {
+  const isValidGoogleMapsUrl = 
+    lowerUrl.includes("google.com/maps") || 
+    lowerUrl.includes("maps.google.com") || 
+    lowerUrl.includes("goo.gl/maps") ||
+    lowerUrl.includes("maps.app.goo.gl") ||
+    lowerUrl.includes("goo.gl/");
+    
+  if (!isValidGoogleMapsUrl) {
     return { success: false, error: "Please provide a valid Google Maps URL" };
+  }
+  
+  // For shortened URLs like maps.app.goo.gl, we need to follow the redirect
+  let resolvedUrl = googleMapsUrl;
+  if (lowerUrl.includes("goo.gl") || lowerUrl.includes("maps.app.goo.gl")) {
+    try {
+      console.log("Following redirect for shortened URL:", googleMapsUrl);
+      const response = await fetch(googleMapsUrl, { 
+        method: 'HEAD', 
+        redirect: 'follow',
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      });
+      resolvedUrl = response.url;
+      console.log("Resolved URL:", resolvedUrl);
+    } catch (error) {
+      console.error("Failed to resolve shortened URL:", error);
+      // Continue with original URL, will try to extract what we can
+    }
   }
 
   // Try to extract place name from URL for text search
@@ -390,7 +412,7 @@ export async function lookupPlaceFromUrl(googleMapsUrl: string): Promise<PlaceLo
     let searchQuery = "";
     
     // Format 1: /maps/place/Place+Name/... or /maps/place/Place+Name@lat,lng
-    const placeMatch = googleMapsUrl.match(/\/place\/([^/@?]+)/);
+    const placeMatch = resolvedUrl.match(/\/place\/([^/@?]+)/);
     if (placeMatch) {
       searchQuery = decodeURIComponent(placeMatch[1].replace(/\+/g, " "));
     }
@@ -398,7 +420,7 @@ export async function lookupPlaceFromUrl(googleMapsUrl: string): Promise<PlaceLo
     // Format 2: ?q=Place+Name or ?query=Place+Name
     if (!searchQuery) {
       try {
-        const url = new URL(googleMapsUrl);
+        const url = new URL(resolvedUrl);
         searchQuery = url.searchParams.get("q") || url.searchParams.get("query") || "";
         if (searchQuery) {
           searchQuery = decodeURIComponent(searchQuery.replace(/\+/g, " "));
@@ -410,7 +432,7 @@ export async function lookupPlaceFromUrl(googleMapsUrl: string): Promise<PlaceLo
     
     // Format 3: search/ followed by place name
     if (!searchQuery) {
-      const searchMatch = googleMapsUrl.match(/\/search\/([^/@?]+)/);
+      const searchMatch = resolvedUrl.match(/\/search\/([^/@?]+)/);
       if (searchMatch) {
         searchQuery = decodeURIComponent(searchMatch[1].replace(/\+/g, " "));
       }
@@ -418,7 +440,7 @@ export async function lookupPlaceFromUrl(googleMapsUrl: string): Promise<PlaceLo
     
     // Format 4: Extract address-like text from URL path
     if (!searchQuery) {
-      const addressMatch = googleMapsUrl.match(/\/([^/@]+),\+([^/@]+)/);
+      const addressMatch = resolvedUrl.match(/\/([^/@]+),\+([^/@]+)/);
       if (addressMatch) {
         searchQuery = decodeURIComponent(`${addressMatch[1]} ${addressMatch[2]}`.replace(/\+/g, " "));
       }
