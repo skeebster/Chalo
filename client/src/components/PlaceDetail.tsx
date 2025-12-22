@@ -4,12 +4,35 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { MapPin, Calendar, Clock, DollarSign, ExternalLink, ThumbsUp, Car, Info } from "lucide-react";
+import { MapPin, Calendar, Clock, DollarSign, ExternalLink, ThumbsUp, Car, Info, Lightbulb, Star, Utensils, Zap, ParkingCircle, Sun, CheckCircle2 } from "lucide-react";
 
 interface PlaceDetailProps {
   place: Place | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+function parseTextToBullets(text: string): string[] {
+  if (!text) return [];
+  
+  let items = text
+    .split(/[•\n]/)
+    .map(item => item.trim())
+    .filter(item => item.length > 0);
+  
+  if (items.length === 1 && items[0].includes('. ')) {
+    const sentences = items[0].split(/\.\s+/).filter(s => s.length > 10);
+    if (sentences.length > 2) {
+      items = sentences.map(s => s.endsWith('.') ? s : s + '.');
+    }
+  }
+  
+  return items;
+}
+
+function parseHighlights(text: string): string[] {
+  if (!text) return [];
+  return text.split(/[;,]/).map(item => item.trim()).filter(item => item.length > 0);
 }
 
 export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
@@ -61,30 +84,114 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
 
             <Separator className="bg-white/10" />
 
-            {/* Highlights & Tips */}
-            <div className="grid md:grid-cols-2 gap-8">
+            {/* Highlights */}
+            {place.keyHighlights && (
               <section>
-                <h3 className="text-lg font-bold text-white mb-3">Highlights</h3>
-                <div className="bg-secondary/50 p-4 rounded-xl border border-white/5">
-                  <p className="text-sm text-muted-foreground">{place.keyHighlights || "No highlights listed."}</p>
+                <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                  <Star className="w-5 h-5 text-primary" /> Highlights
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {parseHighlights(place.keyHighlights).map((highlight, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs py-1.5 px-3">
+                      {highlight}
+                    </Badge>
+                  ))}
                 </div>
               </section>
+            )}
 
+            <Separator className="bg-white/10" />
+
+            {/* Insider Tips */}
+            {place.insiderTips && (
               <section>
-                <h3 className="text-lg font-bold text-white mb-3">Insider Tips</h3>
-                <div className="bg-primary/10 p-4 rounded-xl border border-primary/20">
-                  <p className="text-sm text-primary-foreground/90">{place.insiderTips || "No tips available."}</p>
+                <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                  <Lightbulb className="w-5 h-5 text-primary" /> Insider Tips
+                </h3>
+                <div className="bg-primary/5 p-4 rounded-xl border border-primary/10 space-y-3">
+                  {parseTextToBullets(place.insiderTips).map((tip, i) => (
+                    <div key={i} className="flex gap-3">
+                      <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                      <p className="text-sm text-muted-foreground leading-relaxed">{tip}</p>
+                    </div>
+                  ))}
                 </div>
               </section>
-            </div>
+            )}
 
-            {/* Details Grid */}
-            <div className="grid md:grid-cols-2 gap-6">
-              <DetailRow label="Best Seasons" value={place.bestSeasons} />
-              <DetailRow label="Best Day to Visit" value={place.bestDay} />
-              <DetailRow label="Entry Fee" value={place.entryFee} />
-              <DetailRow label="Parking" value={place.parkingInfo} />
-            </div>
+            <Separator className="bg-white/10" />
+
+            {/* Practical Info Grid */}
+            <section>
+              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <Info className="w-5 h-5 text-primary" /> Practical Information
+              </h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                {place.bestSeasons && (
+                  <InfoCard icon={Sun} label="Best Seasons" value={place.bestSeasons} />
+                )}
+                {place.bestDay && (
+                  <InfoCard icon={Calendar} label="Best Day to Visit" value={place.bestDay} />
+                )}
+                {place.entryFee && (
+                  <InfoCard icon={DollarSign} label="Entry Fee" value={place.entryFee} />
+                )}
+                {place.parkingInfo && (
+                  <InfoCard icon={ParkingCircle} label="Parking" value={place.parkingInfo} />
+                )}
+                {place.evCharging && (
+                  <InfoCard icon={Zap} label="EV Charging" value={place.evCharging} />
+                )}
+                {place.averageVisitDuration && (
+                  <InfoCard icon={Clock} label="Visit Duration" value={place.averageVisitDuration} />
+                )}
+              </div>
+            </section>
+
+            {/* Nearby Restaurants */}
+            {place.nearbyRestaurants && place.nearbyRestaurants.length > 0 && (
+              <>
+                <Separator className="bg-white/10" />
+                <section>
+                  <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                    <Utensils className="w-5 h-5 text-primary" /> Nearby Restaurants
+                  </h3>
+                  <div className="grid gap-3">
+                    {place.nearbyRestaurants.map((restaurant, i) => (
+                      <div key={i} className="flex items-start gap-3 bg-white/5 p-3 rounded-lg border border-white/5">
+                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                          <Utensils className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium text-white text-sm block">{restaurant.name}</span>
+                          {restaurant.description && (
+                            <span className="text-xs text-muted-foreground">{restaurant.description}</span>
+                          )}
+                        </div>
+                        {restaurant.distance && (
+                          <Badge variant="outline" className="text-xs shrink-0">{restaurant.distance}</Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </>
+            )}
+
+            {/* Overall Sentiment */}
+            {place.overallSentiment && (
+              <>
+                <Separator className="bg-white/10" />
+                <section>
+                  <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                    <ThumbsUp className="w-5 h-5 text-primary" /> What Visitors Say
+                  </h3>
+                  <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                    <p className="text-sm text-muted-foreground italic">"{place.overallSentiment}"</p>
+                  </div>
+                </section>
+              </>
+            )}
 
             {/* Action Bar */}
             <div className="pt-4 flex justify-end gap-3">
@@ -117,12 +224,18 @@ function StatBox({ icon: Icon, label, value }: { icon: any, label: string, value
   );
 }
 
-function DetailRow({ label, value }: { label: string, value?: string | null }) {
-  if (!value) return null;
+function InfoCard({ icon: Icon, label, value }: { icon: any, label: string, value: string }) {
   return (
-    <div>
-      <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide block mb-1">{label}</span>
-      <p className="text-sm text-white">{value}</p>
+    <div className="bg-white/5 border border-white/5 p-4 rounded-xl">
+      <div className="flex items-start gap-3">
+        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+          <Icon className="w-4 h-4 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-1">{label}</span>
+          <p className="text-sm text-white leading-relaxed">{value}</p>
+        </div>
+      </div>
     </div>
   );
 }
