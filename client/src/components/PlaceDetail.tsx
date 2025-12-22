@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MapPin, Calendar, Clock, DollarSign, ExternalLink, ThumbsUp, ThumbsDown, Car, Info, Lightbulb, Star, Utensils, Zap, ParkingCircle, Sun, CheckCircle2, MessageCircle, TrendingUp, Sparkles, AlertCircle } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { MapPin, Calendar, Clock, DollarSign, ExternalLink, ThumbsUp, ThumbsDown, Car, Info, Lightbulb, Star, Utensils, Zap, ParkingCircle, Sun, CheckCircle2, MessageCircle, TrendingUp, Sparkles, AlertCircle, Accessibility, Train, Heart } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { NearbyRestaurant } from "@shared/schema";
 
 interface PlaceDetailProps {
   place: Place | null;
@@ -110,6 +112,39 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
     enabled: open && !!place?.id,
   });
 
+  const { data: favorites = [] } = useQuery<number[]>({
+    queryKey: ['/api/favorites'],
+  });
+
+  const isFavorite = place ? favorites.includes(place.id) : false;
+
+  const addFavorite = useMutation({
+    mutationFn: async (placeId: number) => {
+      await apiRequest('POST', `/api/favorites/${placeId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/favorites'] });
+    },
+  });
+
+  const removeFavorite = useMutation({
+    mutationFn: async (placeId: number) => {
+      await apiRequest('DELETE', `/api/favorites/${placeId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/favorites'] });
+    },
+  });
+
+  const toggleFavorite = () => {
+    if (!place) return;
+    if (isFavorite) {
+      removeFavorite.mutate(place.id);
+    } else {
+      addFavorite.mutate(place.id);
+    }
+  };
+
   if (!place) return null;
 
   return (
@@ -125,6 +160,17 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
+          
+          {/* Favorite Button */}
+          <Button
+            size="icon"
+            variant="ghost"
+            className={`absolute top-4 right-4 bg-black/40 backdrop-blur-sm border border-white/20 ${isFavorite ? 'text-red-500' : 'text-white'}`}
+            onClick={toggleFavorite}
+            data-testid="button-favorite"
+          >
+            <Heart className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
+          </Button>
           
           <div className="absolute bottom-4 left-6 right-6">
             <div className="flex gap-2 mb-2">
@@ -361,6 +407,45 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
               </div>
             </section>
 
+            {/* Accessibility & Transit */}
+            {(place.wheelchairAccessible || place.publicTransit) && (
+              <>
+                <Separator className="bg-white/10" />
+                <section>
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <Accessibility className="w-5 h-5 text-primary" /> Accessibility & Transit
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {place.wheelchairAccessible && (
+                      <div className="bg-white/5 border border-white/5 p-4 rounded-xl">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Accessibility className="w-4 h-4 text-green-400" />
+                          <span className="text-sm font-medium text-white">Accessibility</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {place.wheelchairAccessible && <Badge variant="outline" className="text-xs text-green-400 border-green-400/30">Wheelchair Accessible</Badge>}
+                          {place.adaCompliant && <Badge variant="outline" className="text-xs text-green-400 border-green-400/30">ADA Compliant</Badge>}
+                          {place.serviceAnimalsAllowed && <Badge variant="outline" className="text-xs text-green-400 border-green-400/30">Service Animals Welcome</Badge>}
+                        </div>
+                        {place.accessibilityNotes && (
+                          <p className="text-xs text-muted-foreground">{place.accessibilityNotes}</p>
+                        )}
+                      </div>
+                    )}
+                    {place.publicTransit && (
+                      <div className="bg-white/5 border border-white/5 p-4 rounded-xl">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Train className="w-4 h-4 text-blue-400" />
+                          <span className="text-sm font-medium text-white">Public Transit</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{place.publicTransit}</p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </>
+            )}
+
             {/* Nearby Restaurants */}
             {place.nearbyRestaurants && place.nearbyRestaurants.length > 0 && (
               <>
@@ -370,41 +455,54 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
                     <Utensils className="w-5 h-5 text-primary" /> Nearby Restaurants
                   </h3>
                   <div className="grid gap-3">
-                    {place.nearbyRestaurants.map((restaurant, i) => {
+                    {(place.nearbyRestaurants as NearbyRestaurant[]).map((restaurant, i) => {
                       const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurant.name + (place.address ? ' near ' + place.address : ''))}`;
-                      const foodItems = extractFoodItems(restaurant.description || '');
                       
                       return (
                         <div 
                           key={i} 
-                          className="flex items-start gap-3 bg-white/5 p-3 rounded-lg border border-white/5 hover-elevate cursor-pointer"
+                          className="flex items-start gap-3 bg-white/5 p-4 rounded-lg border border-white/5 hover-elevate cursor-pointer"
                           onClick={() => window.open(mapsUrl, '_blank')}
                           data-testid={`restaurant-card-${i}`}
                         >
-                          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                            <Utensils className="w-4 h-4 text-primary" />
+                          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                            <Utensils className="w-5 h-5 text-primary" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-white text-sm">{restaurant.name}</span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium text-white">{restaurant.name}</span>
+                              {restaurant.rating && (
+                                <div className="flex items-center gap-1">
+                                  <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                                  <span className="text-xs text-yellow-400">{restaurant.rating}</span>
+                                </div>
+                              )}
                               <ExternalLink className="w-3 h-3 text-muted-foreground" />
                             </div>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              {restaurant.cuisine && (
+                                <span className="text-xs text-muted-foreground">{restaurant.cuisine}</span>
+                              )}
+                              {restaurant.priceRange && (
+                                <Badge variant="outline" className="text-xs text-green-400 border-green-400/30">{restaurant.priceRange}</Badge>
+                              )}
+                              {restaurant.distance && (
+                                <Badge variant="secondary" className="text-xs">{restaurant.distance}</Badge>
+                              )}
+                            </div>
                             {restaurant.description && (
-                              <span className="text-xs text-muted-foreground block mt-0.5">{restaurant.description}</span>
+                              <p className="text-xs text-muted-foreground mt-1">{restaurant.description}</p>
                             )}
-                            {foodItems.length > 0 && (
+                            {restaurant.specialFeatures && restaurant.specialFeatures.length > 0 && (
                               <div className="flex flex-wrap gap-1.5 mt-2">
-                                {foodItems.map((food, j) => (
+                                {restaurant.specialFeatures.map((feature, j) => (
                                   <Badge key={j} variant="outline" className="text-xs bg-primary/10 border-primary/20 text-primary">
-                                    {food}
+                                    {feature}
                                   </Badge>
                                 ))}
                               </div>
                             )}
                           </div>
-                          {restaurant.distance && (
-                            <Badge variant="secondary" className="text-xs shrink-0">{restaurant.distance}</Badge>
-                          )}
                         </div>
                       );
                     })}

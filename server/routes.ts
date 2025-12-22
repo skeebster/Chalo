@@ -771,5 +771,38 @@ export async function registerRoutes(
     }
   });
 
+  // === Favorites API ===
+  app.get("/api/favorites", async (req, res) => {
+    try {
+      const favoriteIds = await storage.getFavorites();
+      res.json(favoriteIds);
+    } catch (error) {
+      console.error("Error fetching favorites:", error);
+      res.status(500).json({ message: "Failed to fetch favorites" });
+    }
+  });
+
+  app.post("/api/favorites/:placeId", async (req, res) => {
+    try {
+      const placeId = Number(req.params.placeId);
+      const favorite = await storage.addFavorite(placeId);
+      res.json(favorite);
+    } catch (error) {
+      console.error("Error adding favorite:", error);
+      res.status(500).json({ message: "Failed to add favorite" });
+    }
+  });
+
+  app.delete("/api/favorites/:placeId", async (req, res) => {
+    try {
+      const placeId = Number(req.params.placeId);
+      await storage.removeFavorite(placeId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing favorite:", error);
+      res.status(500).json({ message: "Failed to remove favorite" });
+    }
+  });
+
   return httpServer;
 }

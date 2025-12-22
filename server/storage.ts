@@ -1,13 +1,14 @@
 import { db } from "./db";
 import {
-  places, screenshots, userPreferences, weekendPlans,
+  places, screenshots, userPreferences, weekendPlans, favorites,
   type Place, type InsertPlace, type UpdatePlaceRequest,
   type Screenshot, type InsertScreenshot,
   type UserPreferences, type InsertUserPreferences,
   type WeekendPlan, type InsertWeekendPlan,
+  type Favorite, type InsertFavorite,
   insertUserPreferencesSchema
 } from "@shared/schema";
-import { eq, desc, ilike, or, and } from "drizzle-orm";
+import { eq, desc, ilike, or, and, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Places
@@ -31,6 +32,12 @@ export interface IStorage {
   // Preferences
   getPreferences(): Promise<UserPreferences | undefined>;
   updatePreferences(prefs: InsertUserPreferences): Promise<UserPreferences>;
+
+  // Favorites
+  getFavorites(): Promise<number[]>;
+  addFavorite(placeId: number): Promise<Favorite>;
+  removeFavorite(placeId: number): Promise<void>;
+  isFavorite(placeId: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -157,6 +164,30 @@ export class DatabaseStorage implements IStorage {
       const [newPrefs] = await db.insert(userPreferences).values(prefs).returning();
       return newPrefs;
     }
+  }
+
+  // === Favorites ===
+  async getFavorites(): Promise<number[]> {
+    const favs = await db.select().from(favorites);
+    return favs.map(f => f.placeId);
+  }
+
+  async addFavorite(placeId: number): Promise<Favorite> {
+    const existing = await db.select().from(favorites).where(eq(favorites.placeId, placeId));
+    if (existing.length > 0) {
+      return existing[0];
+    }
+    const [newFav] = await db.insert(favorites).values({ placeId }).returning();
+    return newFav;
+  }
+
+  async removeFavorite(placeId: number): Promise<void> {
+    await db.delete(favorites).where(eq(favorites.placeId, placeId));
+  }
+
+  async isFavorite(placeId: number): Promise<boolean> {
+    const [fav] = await db.select().from(favorites).where(eq(favorites.placeId, placeId));
+    return !!fav;
   }
 }
 

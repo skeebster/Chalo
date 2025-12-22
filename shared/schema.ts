@@ -5,6 +5,17 @@ import { relations } from "drizzle-orm";
 
 export * from "./models/chat";
 
+// === Restaurant Type ===
+export interface NearbyRestaurant {
+  name: string;
+  description?: string;
+  distance?: string;
+  cuisine?: string;
+  priceRange?: string; // $, $$, $$$, $$$$
+  rating?: number;
+  specialFeatures?: string[];
+}
+
 // === Places Table ===
 export const places = pgTable("places", {
   id: serial("id").primaryKey(),
@@ -22,21 +33,40 @@ export const places = pgTable("places", {
   averageSpend: integer("average_spend"),
   bestSeasons: text("best_seasons"),
   bestDay: text("best_day"),
+  bestTimeOfDay: text("best_time_of_day"),
   parkingInfo: text("parking_info"),
   evCharging: text("ev_charging"),
   googleRating: numeric("google_rating"),
   tripadvisorRating: numeric("tripadvisor_rating"),
   overallSentiment: text("overall_sentiment"),
-  nearbyRestaurants: jsonb("nearby_restaurants").$type<Array<{name: string, description: string, distance?: string}>>().default([]),
+  nearbyRestaurants: jsonb("nearby_restaurants").$type<NearbyRestaurant[]>().default([]),
   averageVisitDuration: text("average_visit_duration"),
   upcomingEvents: text("upcoming_events"),
   researchSources: text("research_sources"),
+  // Accessibility info
+  wheelchairAccessible: boolean("wheelchair_accessible"),
+  adaCompliant: boolean("ada_compliant"),
+  serviceAnimalsAllowed: boolean("service_animals_allowed"),
+  accessibilityNotes: text("accessibility_notes"),
+  // Public transit
+  publicTransit: text("public_transit"),
+  // Tags for filtering
+  kidFriendly: boolean("kid_friendly").default(true),
+  indoorOutdoor: text("indoor_outdoor"), // 'indoor', 'outdoor', 'both'
+  // User data
   visited: boolean("visited").default(false),
   visitedDate: date("visited_date"),
   userNotes: text("user_notes"),
   imageUrl: text("image_url"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// === Favorites Table ===
+export const favorites = pgTable("favorites", {
+  id: serial("id").primaryKey(),
+  placeId: integer("place_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // === Screenshots/Uploads Table ===
@@ -98,6 +128,11 @@ export const insertWeekendPlanSchema = createInsertSchema(weekendPlans).omit({
   updatedAt: true 
 });
 
+export const insertFavoriteSchema = createInsertSchema(favorites).omit({ 
+  id: true, 
+  createdAt: true 
+});
+
 // === Types ===
 export type Place = typeof places.$inferSelect;
 export type InsertPlace = z.infer<typeof insertPlaceSchema>;
@@ -110,6 +145,9 @@ export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
 
 export type WeekendPlan = typeof weekendPlans.$inferSelect;
 export type InsertWeekendPlan = z.infer<typeof insertWeekendPlanSchema>;
+
+export type Favorite = typeof favorites.$inferSelect;
+export type InsertFavorite = z.infer<typeof insertFavoriteSchema>;
 
 // === API Types ===
 export type CreatePlaceRequest = InsertPlace;
