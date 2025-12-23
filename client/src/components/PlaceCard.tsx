@@ -61,10 +61,20 @@ export function PlaceCard({ place, onClick }: PlaceCardProps) {
 
         <div className="flex items-center gap-4 text-xs text-muted-foreground border-t border-border/50 pt-4 mt-auto">
           {place.driveTimeMinutes && (
-            <div className="flex items-center gap-1.5">
+            <button
+              className="flex items-center gap-1.5 hover:text-primary transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                const homeAddress = "8 Canvass Ct, Somerset, NJ 08873";
+                const destination = encodeURIComponent(place.address || place.name);
+                const origin = encodeURIComponent(homeAddress);
+                window.open(`https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`, '_blank');
+              }}
+              data-testid={`button-directions-${place.id}`}
+            >
               <Clock className="w-3.5 h-3.5 text-primary" />
               <span>{place.driveTimeMinutes} min drive</span>
-            </div>
+            </button>
           )}
           {place.averageSpend && (
             <div className="flex items-center gap-1.5">

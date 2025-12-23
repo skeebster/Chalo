@@ -216,29 +216,27 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
                     size="sm"
                     variant="ghost"
                     className="bg-black/40 backdrop-blur-sm border border-white/20 text-white gap-1"
-                    onClick={() => setShowPhotoGallery(false)}
-                    data-testid="button-close-gallery"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    Back
-                  </Button>
-                  <Badge className="bg-black/60 text-white border-none">
-                    {currentPhotoIndex + 1} / {photos.length}
-                  </Badge>
-                  <Button
-                    size="sm"
-                    className="bg-primary gap-1"
-                    onClick={() => handleSelectPhoto(photos[currentPhotoIndex].photoReference)}
+                    onClick={() => {
+                      // Auto-save the currently viewed photo as cover when closing
+                      handleSelectPhoto(photos[currentPhotoIndex].photoReference);
+                      setShowPhotoGallery(false);
+                    }}
                     disabled={updatePlaceImage.isPending}
-                    data-testid="button-select-photo"
+                    data-testid="button-close-gallery"
                   >
                     {updatePlaceImage.isPending ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <Check className="w-4 h-4" />
                     )}
-                    Use This
+                    Done
                   </Button>
+                  <Badge className="bg-black/60 text-white border-none">
+                    {currentPhotoIndex + 1} / {photos.length}
+                  </Badge>
+                  <div className="text-xs text-white/70 bg-black/40 backdrop-blur-sm px-2 py-1 rounded">
+                    Scroll to select cover
+                  </div>
                 </div>
 
                 {/* Photo Navigation Arrows */}
@@ -350,10 +348,40 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
             )}
           </div>
           <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
+            {/* Overview - Now at the top */}
+            {place.overview && (
+              <section>
+                <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                  <Info className="w-5 h-5 text-primary" /> Overview
+                </h3>
+                <p className="text-muted-foreground leading-relaxed">{place.overview}</p>
+              </section>
+            )}
+
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-              <StatBox icon={Clock} label="Drive Time" value={`${place.driveTimeMinutes || '--'} min`} />
-              <StatBox icon={Car} label="Distance" value={`${place.distanceMiles || '--'} mi`} />
+              <StatBox 
+                icon={Clock} 
+                label="Drive Time" 
+                value={`${place.driveTimeMinutes || '--'} min`} 
+                onClick={() => {
+                  const homeAddress = "8 Canvass Ct, Somerset, NJ 08873";
+                  const destination = encodeURIComponent(place.address || place.name);
+                  const origin = encodeURIComponent(homeAddress);
+                  window.open(`https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`, '_blank');
+                }}
+              />
+              <StatBox 
+                icon={Car} 
+                label="Distance" 
+                value={`${place.distanceMiles || '--'} mi`}
+                onClick={() => {
+                  const homeAddress = "8 Canvass Ct, Somerset, NJ 08873";
+                  const destination = encodeURIComponent(place.address || place.name);
+                  const origin = encodeURIComponent(homeAddress);
+                  window.open(`https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`, '_blank');
+                }}
+              />
               <StatBox icon={DollarSign} label="Avg Spend" value={`$${place.averageSpend || '--'}`} />
               <StatBox 
                 icon={Star} 
@@ -494,15 +522,6 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
               </>
             ) : null}
 
-            {/* Overview */}
-            <section>
-              <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                <Info className="w-5 h-5 text-primary" /> Overview
-              </h3>
-              <p className="text-muted-foreground leading-relaxed">{place.overview || "No overview available."}</p>
-            </section>
-
-            <Separator className="bg-white/10" />
 
             {/* Highlights */}
             {place.keyHighlights && (
@@ -683,14 +702,19 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
   );
 }
 
-function StatBox({ icon: Icon, label, value, subValue }: { icon: any, label: string, value: string, subValue?: string }) {
+function StatBox({ icon: Icon, label, value, subValue, onClick }: { icon: any, label: string, value: string, subValue?: string, onClick?: () => void }) {
+  const Component = onClick ? 'button' : 'div';
   return (
-    <div className="bg-white/5 border border-white/5 p-3 rounded-xl flex flex-col items-center justify-center text-center">
+    <Component 
+      className={`bg-white/5 border border-white/5 p-3 rounded-xl flex flex-col items-center justify-center text-center ${onClick ? 'cursor-pointer hover:bg-white/10 transition-colors' : ''}`}
+      onClick={onClick}
+      data-testid={onClick ? `stat-${label.toLowerCase().replace(' ', '-')}` : undefined}
+    >
       <Icon className="w-5 h-5 text-primary mb-1" />
       <span className="text-xs text-muted-foreground uppercase tracking-wider">{label}</span>
       <span className="font-bold text-white">{value}</span>
       {subValue && <span className="text-xs text-muted-foreground">{subValue}</span>}
-    </div>
+    </Component>
   );
 }
 
