@@ -319,6 +319,12 @@ async function researchPlaceWithAI(placeName: string, address: string, googleRat
         {
           role: "system",
           content: `You are a travel research expert. Generate comprehensive destination information for families planning weekend trips. 
+
+IMPORTANT RESTRICTIONS:
+- NEVER mention or recommend alcohol, bars, wineries, breweries, or drinking establishments
+- NEVER recommend chain restaurants like Panera, Chick-fil-A, McDonald's, Starbucks, Subway, etc.
+- Focus on unique local restaurants and cafes only
+- Do not include any accessibility or wheelchair information
           
 Return a JSON object with these fields (all as strings unless noted):
 {
@@ -334,14 +340,14 @@ Return a JSON object with these fields (all as strings unless noted):
   "parkingInfo": "parking situation and costs",
   "evCharging": "EV charging availability nearby",
   "overallSentiment": "1 sentence summary of visitor sentiment",
-  "nearbyRestaurants": [{"name": "Restaurant Name", "description": "brief description", "distance": "X mi"}],
+  "nearbyRestaurants": [{"name": "Local Restaurant Name", "description": "brief description", "distance": "X mi"}],
   "averageVisitDuration": "typical time spent",
   "kidFriendly": <boolean>,
   "indoorOutdoor": "indoor" or "outdoor" or "both",
   "officialWebsite": "official website URL if known, or null"
 }
 
-Be specific and accurate. If unsure about something, provide reasonable estimates based on similar venues.`
+Be specific and accurate. Only recommend unique, local dining options - no chains. If unsure about something, provide reasonable estimates based on similar venues.`
         },
         {
           role: "user",
@@ -452,12 +458,7 @@ export async function lookupPlaceByName(placeName: string, additionalContext?: s
     nearbyRestaurants: aiResearch.nearbyRestaurants || [],
     averageVisitDuration: aiResearch.averageVisitDuration || null,
     upcomingEvents: null,
-    researchSources: null,
-    wheelchairAccessible: details.accessibilityOptions?.wheelchairAccessibleEntrance || 
-                          details.accessibilityOptions?.wheelchairAccessibleSeating || false,
-    adaCompliant: details.accessibilityOptions?.wheelchairAccessibleEntrance || false,
-    serviceAnimalsAllowed: true,
-    accessibilityNotes: "Contact venue for specific accessibility needs.",
+    researchSources: aiResearch.researchSources || null,
     publicTransit: null,
     kidFriendly: aiResearch.kidFriendly ?? true,
     indoorOutdoor: aiResearch.indoorOutdoor || mapTypesToIndoorOutdoor(details.types) || "both",

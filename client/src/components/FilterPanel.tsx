@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronUp, Filter, X, Baby, Accessibility, Home, TreePine, Star, MapPin, Heart } from "lucide-react";
+import { ChevronDown, ChevronUp, Filter, X, Baby, Home, TreePine, Star, MapPin, Heart } from "lucide-react";
 import { PlaceFilters } from "@/hooks/use-places";
 
 interface FilterPanelProps {
@@ -18,7 +18,6 @@ export function FilterPanel({ filters, onFiltersChange }: FilterPanelProps) {
 
   const activeFilterCount = [
     filters.kidFriendly,
-    filters.wheelchairAccessible,
     filters.indoorOutdoor && filters.indoorOutdoor !== 'all',
     filters.maxDistance && filters.maxDistance < 100,
     filters.minRating && filters.minRating > 0,
@@ -29,7 +28,6 @@ export function FilterPanel({ filters, onFiltersChange }: FilterPanelProps) {
     onFiltersChange({
       ...filters,
       kidFriendly: undefined,
-      wheelchairAccessible: undefined,
       indoorOutdoor: 'all',
       maxDistance: undefined,
       minRating: undefined,
@@ -74,17 +72,6 @@ export function FilterPanel({ filters, onFiltersChange }: FilterPanelProps) {
               >
                 <Baby className="w-4 h-4" />
                 Kid Friendly
-              </Button>
-              
-              <Button
-                variant={filters.wheelchairAccessible ? "default" : "outline"}
-                size="sm"
-                className="gap-2"
-                onClick={() => onFiltersChange({ ...filters, wheelchairAccessible: !filters.wheelchairAccessible })}
-                data-testid="button-filter-wheelchair"
-              >
-                <Accessibility className="w-4 h-4" />
-                Wheelchair Accessible
               </Button>
 
               <Button

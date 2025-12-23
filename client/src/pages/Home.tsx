@@ -80,12 +80,12 @@ export default function Home() {
               </div>
               <h3 className="text-xl font-bold text-white mb-2">No places found</h3>
               <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                {filters.search || filters.category !== 'all' || filters.kidFriendly || filters.wheelchairAccessible || filters.favoritesOnly
+                {filters.search || filters.category !== 'all' || filters.kidFriendly || filters.favoritesOnly
                   ? "Try adjusting your filters or search query." 
                   : "Get started by importing sample destinations or upload your own."}
               </p>
               
-              {!filters.search && filters.category === 'all' && !filters.kidFriendly && !filters.wheelchairAccessible && !filters.favoritesOnly && (
+              {!filters.search && filters.category === 'all' && !filters.kidFriendly && !filters.favoritesOnly && (
                 <Button onClick={handleImport} disabled={importMutation.isPending}>
                   {importMutation.isPending ? "Importing..." : "Import Sample Data"}
                 </Button>

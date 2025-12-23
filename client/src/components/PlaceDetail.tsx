@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MapPin, Calendar, Clock, DollarSign, ExternalLink, ThumbsUp, ThumbsDown, Car, Info, Lightbulb, Star, Utensils, Zap, ParkingCircle, Sun, CheckCircle2, MessageCircle, TrendingUp, Sparkles, AlertCircle, Accessibility, Train, Heart } from "lucide-react";
+import { MapPin, Calendar, Clock, DollarSign, ExternalLink, ThumbsUp, ThumbsDown, Car, Info, Lightbulb, Star, Utensils, Zap, ParkingCircle, Sun, CheckCircle2, MessageCircle, TrendingUp, Sparkles, AlertCircle, Train, Heart } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { NearbyRestaurant } from "@shared/schema";
@@ -407,40 +407,16 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
               </div>
             </section>
 
-            {/* Accessibility & Transit */}
-            {(place.wheelchairAccessible || place.publicTransit) && (
+            {/* Public Transit */}
+            {place.publicTransit && (
               <>
                 <Separator className="bg-white/10" />
                 <section>
                   <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                    <Accessibility className="w-5 h-5 text-primary" /> Accessibility & Transit
+                    <Train className="w-5 h-5 text-primary" /> Public Transit
                   </h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {place.wheelchairAccessible && (
-                      <div className="bg-white/5 border border-white/5 p-4 rounded-xl">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Accessibility className="w-4 h-4 text-green-400" />
-                          <span className="text-sm font-medium text-white">Accessibility</span>
-                        </div>
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {place.wheelchairAccessible && <Badge variant="outline" className="text-xs text-green-400 border-green-400/30">Wheelchair Accessible</Badge>}
-                          {place.adaCompliant && <Badge variant="outline" className="text-xs text-green-400 border-green-400/30">ADA Compliant</Badge>}
-                          {place.serviceAnimalsAllowed && <Badge variant="outline" className="text-xs text-green-400 border-green-400/30">Service Animals Welcome</Badge>}
-                        </div>
-                        {place.accessibilityNotes && (
-                          <p className="text-xs text-muted-foreground">{place.accessibilityNotes}</p>
-                        )}
-                      </div>
-                    )}
-                    {place.publicTransit && (
-                      <div className="bg-white/5 border border-white/5 p-4 rounded-xl">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Train className="w-4 h-4 text-blue-400" />
-                          <span className="text-sm font-medium text-white">Public Transit</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">{place.publicTransit}</p>
-                      </div>
-                    )}
+                  <div className="bg-white/5 border border-white/5 p-4 rounded-xl">
+                    <p className="text-sm text-muted-foreground">{place.publicTransit}</p>
                   </div>
                 </section>
               </>

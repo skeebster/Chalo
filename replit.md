@@ -8,6 +8,12 @@ A personalized weekend adventure discovery platform that helps users find and pl
 
 Preferred communication style: Simple, everyday language.
 
+Content restrictions:
+- Never discuss or recommend alcohol, bars, wineries, breweries, or drinking establishments
+- Do not include accessibility/wheelchair information (removed from schema)
+- Never suggest chain restaurants like Panera, Chick-fil-A, McDonald's, Starbucks, Subway, etc.
+- Only recommend unique, local dining options
+
 ## System Architecture
 
 ### Frontend Architecture

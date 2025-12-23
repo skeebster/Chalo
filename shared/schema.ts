@@ -43,11 +43,6 @@ export const places = pgTable("places", {
   averageVisitDuration: text("average_visit_duration"),
   upcomingEvents: text("upcoming_events"),
   researchSources: text("research_sources"),
-  // Accessibility info
-  wheelchairAccessible: boolean("wheelchair_accessible"),
-  adaCompliant: boolean("ada_compliant"),
-  serviceAnimalsAllowed: boolean("service_animals_allowed"),
-  accessibilityNotes: text("accessibility_notes"),
   // Public transit
   publicTransit: text("public_transit"),
   // Tags for filtering

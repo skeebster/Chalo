@@ -10,7 +10,6 @@ export interface PlaceFilters {
   indoorOutdoor?: 'indoor' | 'outdoor' | 'all';
   maxDistance?: number;
   minRating?: number;
-  wheelchairAccessible?: boolean;
   favoritesOnly?: boolean;
 }
 
@@ -28,7 +27,6 @@ export function usePlaces(filters?: PlaceFilters) {
       if (filters?.indoorOutdoor && filters.indoorOutdoor !== 'all') cleanFilters.indoorOutdoor = filters.indoorOutdoor;
       if (filters?.maxDistance) cleanFilters.maxDistance = filters.maxDistance.toString();
       if (filters?.minRating) cleanFilters.minRating = filters.minRating.toString();
-      if (filters?.wheelchairAccessible) cleanFilters.wheelchairAccessible = 'true';
       if (filters?.favoritesOnly) cleanFilters.favoritesOnly = 'true';
 
       const url = filters ? `${api.places.list.path}?${new URLSearchParams(cleanFilters)}` : api.places.list.path;
