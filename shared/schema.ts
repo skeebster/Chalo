@@ -45,6 +45,9 @@ export const places = pgTable("places", {
   researchSources: text("research_sources"),
   // Public transit
   publicTransit: text("public_transit"),
+  // AllTrails integration for nature places
+  alltrailsUrl: text("alltrails_url"),
+  recommendedTrails: jsonb("recommended_trails").$type<Array<{name: string, rating: number, difficulty: string, length: string, url: string}>>().default([]),
   // Tags for filtering
   kidFriendly: boolean("kid_friendly").default(true),
   indoorOutdoor: text("indoor_outdoor"), // 'indoor', 'outdoor', 'both'
