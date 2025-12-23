@@ -102,10 +102,6 @@ function validateAndFillPlace(partialPlace: Partial<InsertPlace>): InsertPlace |
     averageVisitDuration: partialPlace.averageVisitDuration || null,
     upcomingEvents: partialPlace.upcomingEvents || null,
     researchSources: partialPlace.researchSources || null,
-    wheelchairAccessible: partialPlace.wheelchairAccessible ?? false,
-    adaCompliant: partialPlace.adaCompliant ?? false,
-    serviceAnimalsAllowed: partialPlace.serviceAnimalsAllowed ?? true,
-    accessibilityNotes: partialPlace.accessibilityNotes || "Contact venue for specific accessibility needs.",
     publicTransit: partialPlace.publicTransit || null,
     kidFriendly: partialPlace.kidFriendly ?? true,
     indoorOutdoor: partialPlace.indoorOutdoor || "both",
@@ -1356,5 +1352,189 @@ export async function registerRoutes(
     }
   });
 
+  // ========= Google Calendar Integration =========
+  
+  // Add a single place visit to Google Calendar
+  app.post("/api/calendar/add-event", async (req, res) => {
+    try {
+      const { createCalendarEvent } = await import("./googleCalendar");
+      
+      const { placeId, date, startTime, endTime, notes } = req.body;
+      
+      if (!placeId || !date) {
+        return res.status(400).json({ error: "Place ID and date are required" });
+      }
+      
+      const place = await storage.getPlace(placeId);
+      if (!place) {
+        return res.status(404).json({ error: "Place not found" });
+      }
+      
+      // Build event description with place details
+      const descriptionParts = [];
+      if (place.overview) descriptionParts.push(place.overview);
+      if (place.address) descriptionParts.push(`\nAddress: ${place.address}`);
+      if (place.driveTimeMinutes) descriptionParts.push(`Drive time: ~${place.driveTimeMinutes} min from home`);
+      if (place.entryFee) descriptionParts.push(`Entry fee: ${place.entryFee}`);
+      if (place.bestTimeOfDay) descriptionParts.push(`Best time: ${place.bestTimeOfDay}`);
+      if (place.insiderTips) descriptionParts.push(`\nInsider tips: ${place.insiderTips.substring(0, 500)}...`);
+      if (place.parkingInfo) descriptionParts.push(`\nParking: ${place.parkingInfo}`);
+      if (notes) descriptionParts.push(`\nNotes: ${notes}`);
+      if (place.googleMapsUrl) descriptionParts.push(`\nGoogle Maps: ${place.googleMapsUrl}`);
+      
+      // Parse times or use defaults based on place data
+      const defaultStart = startTime || "10:00";
+      const defaultEnd = endTime || (place.averageVisitDuration 
+        ? calculateEndTime(defaultStart, place.averageVisitDuration)
+        : "14:00");
+      
+      const startDateTime = `${date}T${defaultStart}:00`;
+      const endDateTime = `${date}T${defaultEnd}:00`;
+      
+      const event = await createCalendarEvent({
+        title: `Visit: ${place.name}`,
+        description: descriptionParts.join('\n'),
+        location: place.address || place.name,
+        startDateTime,
+        endDateTime,
+        timeZone: 'America/New_York',
+      });
+      
+      res.json({ 
+        success: true, 
+        eventId: event.id,
+        eventLink: event.htmlLink,
+        message: `Added "${place.name}" to your calendar for ${date}`
+      });
+    } catch (error: any) {
+      console.error("Calendar event creation error:", error);
+      res.status(500).json({ 
+        error: "Failed to add event to calendar",
+        details: error.message 
+      });
+    }
+  });
+  
+  // Add multiple stops (trip plan) to Google Calendar
+  app.post("/api/calendar/add-trip", async (req, res) => {
+    try {
+      const { createCalendarEvent } = await import("./googleCalendar");
+      
+      const { schedule, date, notes } = req.body;
+      
+      if (!schedule || !Array.isArray(schedule) || schedule.length === 0) {
+        return res.status(400).json({ error: "Schedule with at least one segment is required" });
+      }
+      
+      if (!date) {
+        return res.status(400).json({ error: "Date is required" });
+      }
+      
+      const createdEvents = [];
+      
+      for (const segment of schedule) {
+        const { type, title, startTime, endTime, description, location, placeId } = segment;
+        
+        if (!startTime || !endTime || !title) continue;
+        
+        let eventDescription = description || '';
+        
+        // If it's a place activity, enrich with place data
+        if (placeId) {
+          const place = await storage.getPlace(placeId);
+          if (place) {
+            const extraInfo = [];
+            if (place.entryFee) extraInfo.push(`Entry: ${place.entryFee}`);
+            if (place.parkingInfo) extraInfo.push(`Parking: ${place.parkingInfo}`);
+            if (place.googleMapsUrl) extraInfo.push(`Maps: ${place.googleMapsUrl}`);
+            if (extraInfo.length > 0) {
+              eventDescription += '\n\n' + extraInfo.join('\n');
+            }
+          }
+        }
+        
+        if (notes) {
+          eventDescription += `\n\nTrip notes: ${notes}`;
+        }
+        
+        const startDateTime = `${date}T${startTime}:00`;
+        const endDateTime = `${date}T${endTime}:00`;
+        
+        try {
+          const event = await createCalendarEvent({
+            title: title,
+            description: eventDescription,
+            location: location || '',
+            startDateTime,
+            endDateTime,
+            timeZone: 'America/New_York',
+          });
+          
+          createdEvents.push({
+            title,
+            eventId: event.id,
+            eventLink: event.htmlLink,
+          });
+        } catch (eventError: any) {
+          console.error(`Failed to create event "${title}":`, eventError.message);
+        }
+      }
+      
+      res.json({
+        success: true,
+        eventsCreated: createdEvents.length,
+        events: createdEvents,
+        message: `Added ${createdEvents.length} events to your calendar for ${date}`
+      });
+    } catch (error: any) {
+      console.error("Trip calendar creation error:", error);
+      res.status(500).json({
+        error: "Failed to add trip to calendar",
+        details: error.message
+      });
+    }
+  });
+  
+  // Check if Google Calendar is connected
+  app.get("/api/calendar/status", async (req, res) => {
+    try {
+      const { getUncachableGoogleCalendarClient } = await import("./googleCalendar");
+      const calendar = await getUncachableGoogleCalendarClient();
+      
+      // Try to list calendars to verify connection
+      const calendarList = await calendar.calendarList.list({ maxResults: 1 });
+      
+      res.json({
+        connected: true,
+        primaryEmail: calendarList.data.items?.[0]?.summary || 'Connected'
+      });
+    } catch (error: any) {
+      console.error("Calendar status check error:", error);
+      res.json({
+        connected: false,
+        error: error.message
+      });
+    }
+  });
+
   return httpServer;
+}
+
+// Helper to calculate end time based on visit duration
+function calculateEndTime(startTime: string, durationStr: string): string {
+  const [hours, minutes] = startTime.split(':').map(Number);
+  
+  // Parse duration like "2-3 hours" or "3 hours"
+  const durationMatch = durationStr.match(/(\d+)(?:-(\d+))?\s*hours?/i);
+  let durationHours = 2; // default
+  if (durationMatch) {
+    durationHours = parseInt(durationMatch[2] || durationMatch[1]);
+  }
+  
+  let endHours = hours + durationHours;
+  let endMinutes = minutes;
+  
+  if (endHours >= 24) endHours = 23;
+  
+  return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
 }

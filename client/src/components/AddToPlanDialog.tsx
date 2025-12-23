@@ -6,7 +6,9 @@ import { Place, WeekendPlan } from "@shared/schema";
 import { useCreatePlan } from "@/hooks/use-plans";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo, useEffect } from "react";
-import { Calendar, Clock, Car, Coffee, Utensils, MapPin, Sun, Moon, Home, Loader2, Check, ChevronLeft, ChevronRight, Plus, X, GripVertical, ArrowUp, ArrowDown, Sparkles } from "lucide-react";
+import { Calendar, CalendarPlus, Clock, Car, Coffee, Utensils, MapPin, Sun, Moon, Home, Loader2, Check, ChevronLeft, ChevronRight, Plus, X, GripVertical, ArrowUp, ArrowDown, Sparkles } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { format, addDays, nextSaturday, isSaturday, isSunday, startOfDay, addMinutes, setHours, setMinutes } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
@@ -425,6 +427,57 @@ export function AddToPlanDialog({ place, open, onOpenChange }: AddToPlanDialogPr
     }
   };
   
+  const exportToCalendar = useMutation({
+    mutationFn: async () => {
+      const parse12HourTo24Hour = (time12h: string): string => {
+        const match = time12h.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+        if (!match) return '12:00';
+        
+        let hours = parseInt(match[1]);
+        const minutes = match[2];
+        const isPM = match[3].toUpperCase() === 'PM';
+        
+        if (isPM && hours !== 12) {
+          hours += 12;
+        } else if (!isPM && hours === 12) {
+          hours = 0;
+        }
+        
+        return `${hours.toString().padStart(2, '0')}:${minutes}`;
+      };
+      
+      const calendarSchedule = schedule.map(item => ({
+        type: item.type,
+        title: item.activity,
+        startTime: parse12HourTo24Hour(item.time),
+        endTime: parse12HourTo24Hour(item.endTime),
+        description: item.description + (item.details ? '\n\n' + item.details.join('\n') : ''),
+        location: item.placeId ? plannedPlaces.find(p => p.place.id === item.placeId)?.place.address || '' : '',
+        placeId: item.placeId,
+      }));
+      
+      const response = await apiRequest('POST', '/api/calendar/add-trip', {
+        schedule: calendarSchedule,
+        date: format(selectedDate, 'yyyy-MM-dd'),
+        notes: `Weekend adventure: ${plannedPlaces.map(p => p.place.name).join(' → ')}`,
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Exported to Calendar",
+        description: data.message || `Added ${data.eventsCreated} events to your Google Calendar`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Calendar Export Failed",
+        description: error.message || "Could not export to Google Calendar",
+        variant: "destructive",
+      });
+    },
+  });
+  
   // Calculate total drive time and visit time
   const totalDriveTime = useMemo(() => {
     let total = 0;
@@ -711,6 +764,25 @@ export function AddToPlanDialog({ place, open, onOpenChange }: AddToPlanDialogPr
               onClick={() => onOpenChange(false)}
             >
               Cancel
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1 gap-2"
+              onClick={() => exportToCalendar.mutate()}
+              disabled={exportToCalendar.isPending || plannedPlaces.length === 0}
+              data-testid="button-export-calendar"
+            >
+              {exportToCalendar.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <CalendarPlus className="w-4 h-4" />
+                  Export to Calendar
+                </>
+              )}
             </Button>
             <Button
               className="flex-1 gap-2"

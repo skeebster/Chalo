@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MapPin, Calendar, Clock, DollarSign, ExternalLink, ThumbsUp, ThumbsDown, Car, Info, Lightbulb, Star, Utensils, Zap, ParkingCircle, Sun, CheckCircle2, MessageCircle, TrendingUp, Sparkles, AlertCircle, Train, Heart, Camera, ChevronLeft, ChevronRight, Check, Loader2, Mountain } from "lucide-react";
+import { MapPin, Calendar, CalendarPlus, Clock, DollarSign, ExternalLink, ThumbsUp, ThumbsDown, Car, Info, Lightbulb, Star, Utensils, Zap, ParkingCircle, Sun, CheckCircle2, MessageCircle, TrendingUp, Sparkles, AlertCircle, Train, Heart, Camera, ChevronLeft, ChevronRight, Check, Loader2, Mountain } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format, addDays, nextSaturday, isSaturday, isSunday } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -119,9 +123,34 @@ function getSentimentBgColor(score: number): string {
 }
 
 export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
+  const { toast } = useToast();
   const [showPhotoGallery, setShowPhotoGallery] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [showAddToPlan, setShowAddToPlan] = useState(false);
+  const [showCalendarPicker, setShowCalendarPicker] = useState(false);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(undefined);
+  
+  const addToCalendar = useMutation({
+    mutationFn: async ({ placeId, date }: { placeId: number; date: string }) => {
+      const response = await apiRequest('POST', '/api/calendar/add-event', { placeId, date });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Added to Calendar",
+        description: data.message || "Event created successfully",
+      });
+      setShowCalendarPicker(false);
+      setSelectedCalendarDate(undefined);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Calendar Error",
+        description: error.message || "Failed to add to calendar",
+        variant: "destructive",
+      });
+    },
+  });
 
   const { data: reviewData, isLoading: reviewsLoading } = useQuery<ReviewAnalysis>({
     queryKey: ['/api/places', place?.id, 'reviews'],
@@ -858,6 +887,42 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
                 <Calendar className="w-4 h-4" />
                 Add to Plan
               </Button>
+              
+              <Popover open={showCalendarPicker} onOpenChange={setShowCalendarPicker}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="gap-2" data-testid="button-add-to-calendar">
+                    <CalendarPlus className="w-4 h-4" />
+                    Add to Calendar
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <div className="p-3 border-b">
+                    <p className="text-sm font-medium">Select a date for your visit</p>
+                    <p className="text-xs text-muted-foreground">This will add "{place.name}" to your Google Calendar</p>
+                  </div>
+                  <CalendarComponent
+                    mode="single"
+                    selected={selectedCalendarDate}
+                    onSelect={(date) => {
+                      setSelectedCalendarDate(date);
+                      if (date && place) {
+                        addToCalendar.mutate({
+                          placeId: place.id,
+                          date: format(date, 'yyyy-MM-dd'),
+                        });
+                      }
+                    }}
+                    disabled={(date) => date < new Date()}
+                    initialFocus
+                  />
+                  {addToCalendar.isPending && (
+                    <div className="p-3 border-t flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Adding to calendar...
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </ScrollArea>
