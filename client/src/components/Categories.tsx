@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { TreePine, Tent, Building2, RollerCoaster, Coffee } from "lucide-react";
+import { TreePine, Tent, Building2, RollerCoaster, Coffee, Waves, Calendar, Navigation } from "lucide-react";
 
 interface CategoriesProps {
   selectedCategory: string;
@@ -14,6 +14,9 @@ export function Categories({ selectedCategory, onSelect }: CategoriesProps) {
     { id: "museum", label: "Museums", icon: Building2 },
     { id: "theme", label: "Theme Parks", icon: RollerCoaster },
     { id: "dining", label: "Dining", icon: Coffee },
+    { id: "beach", label: "Beach", icon: Waves },
+    { id: "weekend", label: "Weekend Trip", icon: Calendar },
+    { id: "roadtrip", label: "Road Trip", icon: Navigation },
   ];
 
   return (
