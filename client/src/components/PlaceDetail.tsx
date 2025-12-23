@@ -157,7 +157,7 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
 
   const updatePlaceImage = useMutation({
     mutationFn: async ({ placeId, imageUrl }: { placeId: number; imageUrl: string }) => {
-      await apiRequest('PATCH', `/api/places/${placeId}`, { imageUrl });
+      await apiRequest('PUT', `/api/places/${placeId}`, { imageUrl });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/places'] });
