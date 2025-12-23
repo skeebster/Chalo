@@ -7,7 +7,7 @@ import OpenAI from "openai";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
-import { getReviewAnalysis, lookupPlaceFromUrl, lookupPlaceByName, processVoiceTranscript, fetchPlacePhotos, PlacePhoto } from "./google-places";
+import { getReviewAnalysis, lookupPlaceFromUrl, lookupPlaceByName, processVoiceTranscript, fetchPlacePhotos, PlacePhoto, enrichPlaceData } from "./google-places";
 import type { InsertPlace, Place, UpdatePlaceRequest } from "@shared/schema";
 
 // Fields to always preserve from existing (user-generated data)
@@ -829,6 +829,51 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Import error:", error);
       res.status(500).json({ success: false, count: 0 });
+    }
+  });
+
+  // === Enrich All Places with Missing Data ===
+  app.post("/api/places/enrich-all", async (req, res) => {
+    try {
+      const allPlaces = await storage.getPlaces();
+      const results: { id: number; name: string; changes: string[] }[] = [];
+      let updatedCount = 0;
+      
+      for (const place of allPlaces) {
+        try {
+          const { updates, changes } = await enrichPlaceData({
+            id: place.id,
+            name: place.name,
+            address: place.address,
+            googleMapsUrl: place.googleMapsUrl,
+            distanceMiles: place.distanceMiles,
+            driveTimeMinutes: place.driveTimeMinutes,
+            googleRating: place.googleRating,
+          });
+          
+          if (Object.keys(updates).length > 0) {
+            await storage.updatePlace(place.id, updates);
+            results.push({ id: place.id, name: place.name, changes });
+            updatedCount++;
+            console.log(`Enriched ${place.name}:`, changes.join(", "));
+          }
+          
+          // Add a small delay between API calls to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } catch (error) {
+          console.error(`Error enriching place ${place.id} (${place.name}):`, error);
+        }
+      }
+      
+      res.json({ 
+        success: true, 
+        totalPlaces: allPlaces.length,
+        updatedCount,
+        results
+      });
+    } catch (error) {
+      console.error("Error enriching places:", error);
+      res.status(500).json({ success: false, message: "Failed to enrich places" });
     }
   });
 

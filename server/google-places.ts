@@ -825,3 +825,108 @@ export async function fetchPhotosFromUrl(googleMapsUrl: string, maxPhotos: numbe
 
   return await fetchPlacePhotos(searchQuery, undefined, maxPhotos);
 }
+
+// Default home address for distance calculations (Somerset, NJ)
+const HOME_ADDRESS = "8 Canvass Ct, Somerset, NJ 08873";
+
+export interface DistanceResult {
+  distanceMiles: number;
+  driveTimeMinutes: number;
+}
+
+// Calculate driving distance and time from home to a destination using legacy Distance Matrix API
+export async function calculateDrivingDistance(destinationAddress: string): Promise<DistanceResult | null> {
+  if (!GOOGLE_PLACES_API_KEY) {
+    console.log("Google Places API key not configured for distance calculation");
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    origins: HOME_ADDRESS,
+    destinations: destinationAddress,
+    mode: "driving",
+    units: "imperial",
+    key: GOOGLE_PLACES_API_KEY,
+  });
+  
+  const url = `https://maps.googleapis.com/maps/api/distancematrix/json?${params}`;
+  
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.status === "OK" && data.rows?.[0]?.elements?.[0]?.status === "OK") {
+      const element = data.rows[0].elements[0];
+      
+      // Distance comes in meters, convert to miles
+      const distanceMeters = element.distance.value;
+      const distanceMiles = Math.round((distanceMeters / 1609.34) * 10) / 10;
+      
+      // Duration comes in seconds, convert to minutes
+      const durationSeconds = element.duration.value;
+      const driveTimeMinutes = Math.round(durationSeconds / 60);
+      
+      console.log(`Distance to ${destinationAddress}: ${distanceMiles} miles, ${driveTimeMinutes} min`);
+      return { distanceMiles, driveTimeMinutes };
+    }
+    
+    console.log("Distance Matrix API error for:", destinationAddress, data.status, data.rows?.[0]?.elements?.[0]?.status);
+    return null;
+  } catch (error) {
+    console.error("Error calculating driving distance:", error);
+    return null;
+  }
+}
+
+export interface EnrichmentResult {
+  success: boolean;
+  updated: string[];
+  error?: string;
+}
+
+// Enrich a place with missing data from Google Places API
+export async function enrichPlaceData(place: { 
+  id: number; 
+  name: string; 
+  address: string | null; 
+  googleMapsUrl: string | null;
+  distanceMiles: string | null;
+  driveTimeMinutes: number | null;
+  googleRating: string | null;
+}): Promise<{ updates: Partial<{ distanceMiles: string; driveTimeMinutes: number; googleRating: string }>, changes: string[] }> {
+  const updates: Partial<{ distanceMiles: string; driveTimeMinutes: number; googleRating: string }> = {};
+  const changes: string[] = [];
+  
+  // Check if we need distance/drive time data
+  const needsDistance = !place.distanceMiles || place.distanceMiles === "1" || parseFloat(place.distanceMiles) === 0;
+  const needsDriveTime = !place.driveTimeMinutes || place.driveTimeMinutes === 1 || place.driveTimeMinutes === 0;
+  
+  if ((needsDistance || needsDriveTime) && place.address) {
+    const distanceResult = await calculateDrivingDistance(place.address);
+    if (distanceResult) {
+      if (needsDistance) {
+        updates.distanceMiles = distanceResult.distanceMiles.toString();
+        changes.push(`distance: ${distanceResult.distanceMiles} mi`);
+      }
+      if (needsDriveTime) {
+        updates.driveTimeMinutes = distanceResult.driveTimeMinutes;
+        changes.push(`drive time: ${distanceResult.driveTimeMinutes} min`);
+      }
+    }
+  }
+  
+  // Check if we need Google rating
+  const needsRating = !place.googleRating || parseFloat(place.googleRating) === 0;
+  if (needsRating) {
+    const { placeId } = await searchPlaceId(place.name, place.address || undefined);
+    if (placeId) {
+      const details = await getPlaceDetails(placeId);
+      if (details?.rating) {
+        updates.googleRating = details.rating.toString();
+        changes.push(`rating: ${details.rating}`);
+      }
+    }
+  }
+  
+  return { updates, changes };
+}
