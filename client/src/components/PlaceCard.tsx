@@ -1,8 +1,19 @@
 import { Place } from "@shared/schema";
-import { Star, MapPin, Clock, Car } from "lucide-react";
+import { Star, MapPin, Clock, Car, Sun, Cloud, CloudRain, Snowflake, CloudLightning } from "lucide-react";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { getDisplayImageUrl, DEFAULT_PLACE_IMAGE } from "@/lib/image-utils";
+import { useWeather } from "@/hooks/use-weather";
+
+function WeatherIcon({ code, className }: { code: number; className?: string }) {
+  if (code === 0 || code === 1) return <Sun className={className} />;
+  if (code >= 2 && code <= 3) return <Cloud className={className} />;
+  if (code >= 45 && code <= 48) return <Cloud className={className} />;
+  if (code >= 51 && code <= 67) return <CloudRain className={className} />;
+  if (code >= 71 && code <= 86) return <Snowflake className={className} />;
+  if (code >= 95 && code <= 99) return <CloudLightning className={className} />;
+  return <Cloud className={className} />;
+}
 
 interface PlaceCardProps {
   place: Place;
@@ -15,6 +26,10 @@ export function PlaceCard({ place, onClick }: PlaceCardProps) {
   
   // Check if this is a highly-rated place (4.8+)
   const isHighlyRated = place.googleRating ? parseFloat(place.googleRating) >= 4.8 : false;
+  
+  // Fetch weather for the destination area (using home coordinates since all places are nearby)
+  // Home: 8 Canvass Ct, Somerset, NJ 08873 = 40.5018, -74.4518
+  const { data: weather } = useWeather(40.5018, -74.4518);
 
   return (
     <motion.div
@@ -47,12 +62,23 @@ export function PlaceCard({ place, onClick }: PlaceCardProps) {
           </Badge>
         </div>
 
-        {place.distanceMiles && (
-          <div className="absolute bottom-3 left-3 flex items-center gap-1 text-xs font-medium text-white/90 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-md">
-            <Car className="w-3 h-3" />
-            {place.distanceMiles} mi
-          </div>
-        )}
+        <div className="absolute bottom-3 left-3 flex items-center gap-2">
+          {place.distanceMiles && (
+            <div className="flex items-center gap-1 text-xs font-medium text-white/90 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-md">
+              <Car className="w-3 h-3" />
+              {place.distanceMiles} mi
+            </div>
+          )}
+          {weather && (
+            <div 
+              className="flex items-center gap-1 text-xs font-medium text-white/90 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-md"
+              title={`${weather.isWeekend ? 'Today' : 'This weekend'}: ${weather.description}, High ${weather.high}°F / Low ${weather.low}°F${weather.precipProb > 20 ? `, ${weather.precipProb}% rain` : ''}`}
+            >
+              <WeatherIcon code={weather.code} className="w-3 h-3" />
+              <span>{weather.temp}°F</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="p-5 flex-1 flex flex-col">
