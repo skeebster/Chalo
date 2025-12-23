@@ -1040,5 +1040,113 @@ export async function registerRoutes(
     }
   });
 
+  // === Data Cleanup Endpoint (one-time use to sanitize existing data) ===
+  app.post("/api/admin/cleanup", async (req, res) => {
+    try {
+      // Chain restaurants to filter out (case-insensitive)
+      const chainRestaurants = [
+        'panera', 'chick-fil-a', 'chickfila', 'mcdonald', 'starbucks', 'subway',
+        'wendy', 'burger king', 'taco bell', 'chipotle', 'dunkin', 'domino',
+        'pizza hut', 'papa john', 'kfc', 'popeye', 'arby', 'five guys',
+        'shake shack', 'in-n-out', 'panda express', 'olive garden', 'applebee',
+        'chili\'s', 'ihop', 'denny', 'cracker barrel', 'red lobster', 'outback',
+        'longhorn', 'cheesecake factory', 'buffalo wild wings', 'hooters',
+        'wingstop', 'jersey mike', 'jimmy john', 'firehouse sub', 'jason\'s deli',
+        'noodles & company', 'qdoba', 'moe\'s', 'del taco', 'jack in the box',
+        'sonic', 'carl\'s jr', 'hardee', 'white castle', 'whataburger',
+        'culver', 'zaxby', 'raising cane', 'wawa', 'sheetz', 'quiktrip',
+        'tim horton', 'krispy kreme', 'baskin', 'cold stone', 'dairy queen',
+        'whole foods', 'trader joe'
+      ];
+      
+      // Alcohol-related terms to remove
+      const alcoholTerms = [
+        'cocktail', 'bartender', 'bar and', 'bar,', 'full-service bar',
+        'wine bar', 'craft beer', 'brewery', 'winery', 'happy hour',
+        'beer garden', 'pub', 'tavern', 'taproom', 'spirits', 'liquor',
+        'mixologist', 'nightclub', 'lounge bar'
+      ];
+      
+      const allPlaces = await storage.getPlaces();
+      const cleanedPlaces: { id: number; name: string; changes: string[] }[] = [];
+      
+      for (const place of allPlaces) {
+        const changes: string[] = [];
+        const updates: Partial<InsertPlace> = {};
+        
+        // Helper to check if text contains alcohol terms
+        const containsAlcoholTerm = (text: string) => {
+          const lower = text.toLowerCase();
+          if (alcoholTerms.some(term => lower.includes(term))) return true;
+          // Check for standalone "bar" (but allow salad bar, juice bar, snack bar, oxygen bar)
+          if (/\bbar\b/.test(lower) && 
+              !lower.includes('salad bar') && 
+              !lower.includes('juice bar') && 
+              !lower.includes('snack bar') && 
+              !lower.includes('oxygen bar')) {
+            return true;
+          }
+          return false;
+        };
+        
+        // Clean key_highlights - remove items mentioning alcohol/bars (stored as text, comma/semicolon separated)
+        if (place.keyHighlights && typeof place.keyHighlights === 'string') {
+          const items = place.keyHighlights.split(/[;,]/).map(s => s.trim()).filter(s => s.length > 0);
+          const cleanedItems = items.filter(item => !containsAlcoholTerm(item));
+          
+          if (cleanedItems.length !== items.length) {
+            updates.keyHighlights = cleanedItems.join('; ');
+            changes.push(`Removed ${items.length - cleanedItems.length} alcohol-related highlights`);
+          }
+        }
+        
+        // Clean overview - remove alcohol references
+        if (place.overview) {
+          let cleanedOverview = place.overview;
+          // Remove phrases mentioning full-service bar, etc.
+          cleanedOverview = cleanedOverview.replace(/,?\s*full-service restaurant and bar/gi, '');
+          cleanedOverview = cleanedOverview.replace(/,?\s*and bar\b/gi, '');
+          cleanedOverview = cleanedOverview.replace(/,?\s*bar and restaurant/gi, ', restaurant');
+          cleanedOverview = cleanedOverview.replace(/\s+/g, ' ').trim();
+          
+          if (cleanedOverview !== place.overview) {
+            updates.overview = cleanedOverview;
+            changes.push('Removed bar references from overview');
+          }
+        }
+        
+        // Clean nearby restaurants - filter out chains
+        if (place.nearbyRestaurants && Array.isArray(place.nearbyRestaurants) && place.nearbyRestaurants.length > 0) {
+          const originalCount = place.nearbyRestaurants.length;
+          const cleanedRestaurants = (place.nearbyRestaurants as any[]).filter(r => {
+            if (!r.name) return true;
+            const lower = r.name.toLowerCase();
+            return !chainRestaurants.some(chain => lower.includes(chain));
+          });
+          
+          if (cleanedRestaurants.length !== originalCount) {
+            updates.nearbyRestaurants = cleanedRestaurants;
+            changes.push(`Removed ${originalCount - cleanedRestaurants.length} chain restaurants`);
+          }
+        }
+        
+        // Apply updates if any changes were made
+        if (Object.keys(updates).length > 0) {
+          await storage.updatePlace(place.id, updates);
+          cleanedPlaces.push({ id: place.id, name: place.name, changes });
+        }
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `Cleaned ${cleanedPlaces.length} places`,
+        details: cleanedPlaces 
+      });
+    } catch (error) {
+      console.error("Cleanup error:", error);
+      res.status(500).json({ success: false, error: "Failed to cleanup data" });
+    }
+  });
+
   return httpServer;
 }
