@@ -834,10 +834,24 @@ export interface DistanceResult {
   driveTimeMinutes: number;
 }
 
+// Calculate estimated drive time from distance using average speed heuristic
+// Uses ~45 mph average for mixed highway/local driving typical of NJ destinations
+export function calculateDriveTimeFromDistance(distanceMiles: number): number {
+  const AVERAGE_SPEED_MPH = 45;
+  return Math.round((distanceMiles / AVERAGE_SPEED_MPH) * 60);
+}
+
 // Calculate driving distance and time from home to a destination using legacy Distance Matrix API
-export async function calculateDrivingDistance(destinationAddress: string): Promise<DistanceResult | null> {
+// Falls back to heuristic calculation if API is unavailable
+export async function calculateDrivingDistance(destinationAddress: string, existingDistanceMiles?: number): Promise<DistanceResult | null> {
   if (!GOOGLE_PLACES_API_KEY) {
     console.log("Google Places API key not configured for distance calculation");
+    // Fallback: if we already have distance, calculate drive time from it
+    if (existingDistanceMiles && existingDistanceMiles > 0) {
+      const driveTimeMinutes = calculateDriveTimeFromDistance(existingDistanceMiles);
+      console.log(`Using heuristic: ${existingDistanceMiles} miles = ${driveTimeMinutes} min`);
+      return { distanceMiles: existingDistanceMiles, driveTimeMinutes };
+    }
     return null;
   }
 
@@ -870,10 +884,23 @@ export async function calculateDrivingDistance(destinationAddress: string): Prom
       return { distanceMiles, driveTimeMinutes };
     }
     
-    console.log("Distance Matrix API error for:", destinationAddress, data.status, data.rows?.[0]?.elements?.[0]?.status);
+    // API failed - use heuristic fallback if we have existing distance
+    console.log("Distance Matrix API unavailable for:", destinationAddress, data.status);
+    if (existingDistanceMiles && existingDistanceMiles > 0) {
+      const driveTimeMinutes = calculateDriveTimeFromDistance(existingDistanceMiles);
+      console.log(`Fallback heuristic: ${existingDistanceMiles} miles = ${driveTimeMinutes} min`);
+      return { distanceMiles: existingDistanceMiles, driveTimeMinutes };
+    }
+    
     return null;
   } catch (error) {
     console.error("Error calculating driving distance:", error);
+    // Fallback on error too
+    if (existingDistanceMiles && existingDistanceMiles > 0) {
+      const driveTimeMinutes = calculateDriveTimeFromDistance(existingDistanceMiles);
+      console.log(`Error fallback: ${existingDistanceMiles} miles = ${driveTimeMinutes} min`);
+      return { distanceMiles: existingDistanceMiles, driveTimeMinutes };
+    }
     return null;
   }
 }
@@ -898,11 +925,18 @@ export async function enrichPlaceData(place: {
   const changes: string[] = [];
   
   // Check if we need distance/drive time data
+  // "1" is a known placeholder value that should be treated as missing
   const needsDistance = !place.distanceMiles || place.distanceMiles === "1" || parseFloat(place.distanceMiles) === 0;
   const needsDriveTime = !place.driveTimeMinutes || place.driveTimeMinutes === 1 || place.driveTimeMinutes === 0;
   
+  // Only use existing distance for fallback if it's not a placeholder value
+  const existingDistanceParsed = place.distanceMiles ? parseFloat(place.distanceMiles) : 0;
+  const hasValidExistingDistance = existingDistanceParsed > 1; // Must be greater than 1 to not be placeholder
+  const existingDistance = hasValidExistingDistance ? existingDistanceParsed : undefined;
+  
   if ((needsDistance || needsDriveTime) && place.address) {
-    const distanceResult = await calculateDrivingDistance(place.address);
+    // Pass existing distance for fallback heuristic calculation (only if valid)
+    const distanceResult = await calculateDrivingDistance(place.address, existingDistance);
     if (distanceResult) {
       if (needsDistance) {
         updates.distanceMiles = distanceResult.distanceMiles.toString();
@@ -912,7 +946,14 @@ export async function enrichPlaceData(place: {
         updates.driveTimeMinutes = distanceResult.driveTimeMinutes;
         changes.push(`drive time: ${distanceResult.driveTimeMinutes} min`);
       }
+    } else if (needsDistance || needsDriveTime) {
+      console.log(`Cannot enrich ${place.name}: Distance Matrix API unavailable and no valid existing distance`);
     }
+  } else if (needsDriveTime && hasValidExistingDistance) {
+    // If we only need drive time and have valid distance, use heuristic directly
+    const driveTimeMinutes = calculateDriveTimeFromDistance(existingDistanceParsed);
+    updates.driveTimeMinutes = driveTimeMinutes;
+    changes.push(`drive time: ${driveTimeMinutes} min (calculated)`);
   }
   
   // Check if we need Google rating
