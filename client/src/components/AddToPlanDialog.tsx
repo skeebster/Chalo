@@ -1,23 +1,19 @@
-import { Navbar } from "@/components/Navbar";
-import { usePlans, useDeletePlan } from "@/hooks/use-plans";
-import { useQuery } from "@tanstack/react-query";
-import { Place } from "@shared/schema";
-import { useState } from "react";
-import { Loader2, Calendar, Clock, Car, Coffee, Utensils, MapPin, Sun, Moon, Home, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { format, setHours, setMinutes, addMinutes } from "date-fns";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Place, WeekendPlan } from "@shared/schema";
+import { useCreatePlan } from "@/hooks/use-plans";
+import { useState, useMemo } from "react";
+import { Calendar, Clock, Car, Coffee, Utensils, MapPin, Sun, Moon, Home, Loader2, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { format, addDays, nextSaturday, nextSunday, isSaturday, isSunday, startOfDay, addMinutes, setHours, setMinutes } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+
+interface AddToPlanDialogProps {
+  place: Place | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
 
 interface ScheduleItem {
   time: string;
@@ -79,6 +75,7 @@ function generateSchedule(place: Place): ScheduleItem[] {
   });
   currentTime = addMinutes(currentTime, 30);
   
+  const departureTime = currentTime;
   schedule.push({
     time: formatTime(currentTime),
     endTime: formatTime(addMinutes(currentTime, driveTime)),
@@ -89,6 +86,7 @@ function generateSchedule(place: Place): ScheduleItem[] {
   });
   currentTime = addMinutes(currentTime, driveTime);
   
+  const arrivalTime = currentTime;
   const morningActivityDuration = Math.min(visitDuration, 120);
   schedule.push({
     time: formatTime(currentTime),
@@ -191,6 +189,25 @@ function generateSchedule(place: Place): ScheduleItem[] {
   return schedule;
 }
 
+function getNextWeekendDates(): { saturday: Date; sunday: Date } {
+  const today = new Date();
+  let saturday: Date;
+  let sunday: Date;
+  
+  if (isSaturday(today)) {
+    saturday = today;
+    sunday = addDays(today, 1);
+  } else if (isSunday(today)) {
+    saturday = nextSaturday(today);
+    sunday = addDays(saturday, 1);
+  } else {
+    saturday = nextSaturday(today);
+    sunday = addDays(saturday, 1);
+  }
+  
+  return { saturday: startOfDay(saturday), sunday: startOfDay(sunday) };
+}
+
 function getTypeColor(type: string): string {
   switch (type) {
     case 'home': return 'bg-blue-500/20 border-blue-500/30 text-blue-400';
@@ -202,109 +219,131 @@ function getTypeColor(type: string): string {
   }
 }
 
-interface PlanCardProps {
-  plan: any;
-  places: Place[];
-  onDelete: (id: number) => void;
-}
-
-function PlanCard({ plan, places, onDelete }: PlanCardProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+export function AddToPlanDialog({ place, open, onOpenChange }: AddToPlanDialogProps) {
+  const { toast } = useToast();
+  const createPlan = useCreatePlan();
+  const { saturday, sunday } = useMemo(() => getNextWeekendDates(), []);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [isSaturdaySelected, setIsSaturdaySelected] = useState(true);
   
-  const planPlaces = (plan.places || []).map((p: { placeId: number }) => 
-    places.find(place => place.id === p.placeId)
-  ).filter(Boolean) as Place[];
+  const adjustedSaturday = startOfDay(addDays(saturday, weekOffset * 7));
+  const adjustedSunday = startOfDay(addDays(sunday, weekOffset * 7));
   
-  const primaryPlace = planPlaces[0];
-  const schedule = primaryPlace ? generateSchedule(primaryPlace) : [];
+  const selectedDate = isSaturdaySelected ? adjustedSaturday : adjustedSunday;
   
-  const planDate = new Date(plan.planDate + 'T00:00:00');
-  const dayOfWeek = format(planDate, 'EEEE');
-  const formattedDate = format(planDate, 'MMMM d, yyyy');
+  const schedule = useMemo(() => {
+    if (!place) return [];
+    return generateSchedule(place);
+  }, [place]);
+  
+  const handleCreatePlan = async () => {
+    if (!place) return;
+    
+    try {
+      await createPlan.mutateAsync({
+        planDate: format(selectedDate, 'yyyy-MM-dd'),
+        places: [{ placeId: place.id, notes: '' }],
+        notes: `Day trip to ${place.name}`,
+        status: 'planned'
+      });
+      
+      toast({
+        title: "Plan Created!",
+        description: `Your trip to ${place.name} is scheduled for ${format(selectedDate, 'EEEE, MMMM d')}.`,
+      });
+      
+      onOpenChange(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create plan. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  if (!place) return null;
   
   return (
-    <Card className="overflow-hidden border-white/10">
-      <div className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <Badge variant="outline" className="text-xs bg-primary/20 border-primary/30 text-primary">
-                {dayOfWeek}
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                {plan.status}
-              </Badge>
-            </div>
-            <h3 className="text-xl font-bold text-white">{formattedDate}</h3>
-            {primaryPlace && (
-              <p className="text-muted-foreground mt-1">Day trip to {primaryPlace.name}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] p-0 overflow-hidden bg-card border-white/10">
+        <DialogHeader className="p-6 pb-0">
+          <DialogTitle className="text-xl font-display font-bold text-white flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-primary" />
+            Plan Your Day at {place.name}
+          </DialogTitle>
+          <DialogDescription className="text-muted-foreground">
+            Select a day and review your personalized hour-by-hour schedule.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="px-6 pt-4">
+          <div className="flex items-center justify-between mb-4">
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setDeleteDialogOpen(true)}
-              className="text-muted-foreground hover:text-red-400"
-              data-testid={`button-delete-plan-${plan.id}`}
+              onClick={() => setWeekOffset(weekOffset - 1)}
+              disabled={weekOffset <= 0}
+              data-testid="button-prev-week"
             >
-              <Trash2 className="w-4 h-4" />
+              <ChevronLeft className="w-4 h-4" />
             </Button>
+            
+            <div className="flex gap-3">
+              <Button
+                variant={isSaturdaySelected ? "default" : "outline"}
+                className="min-w-[140px]"
+                onClick={() => setIsSaturdaySelected(true)}
+                data-testid="button-select-saturday"
+              >
+                <div className="flex flex-col items-center">
+                  <span className="font-bold">Saturday</span>
+                  <span className="text-xs opacity-80">{format(adjustedSaturday, 'MMM d')}</span>
+                </div>
+              </Button>
+              
+              <Button
+                variant={!isSaturdaySelected ? "default" : "outline"}
+                className="min-w-[140px]"
+                onClick={() => setIsSaturdaySelected(false)}
+                data-testid="button-select-sunday"
+              >
+                <div className="flex flex-col items-center">
+                  <span className="font-bold">Sunday</span>
+                  <span className="text-xs opacity-80">{format(adjustedSunday, 'MMM d')}</span>
+                </div>
+              </Button>
+            </div>
+            
             <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setExpanded(!expanded)}
-              className="gap-1"
-              data-testid={`button-expand-plan-${plan.id}`}
+              variant="ghost"
+              size="icon"
+              onClick={() => setWeekOffset(weekOffset + 1)}
+              disabled={weekOffset >= 8}
+              data-testid="button-next-week"
             >
-              {expanded ? (
-                <>
-                  <ChevronUp className="w-4 h-4" />
-                  Hide Schedule
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="w-4 h-4" />
-                  View Schedule
-                </>
-              )}
+              <ChevronRight className="w-4 h-4" />
             </Button>
+          </div>
+          
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+            <Clock className="w-4 h-4" />
+            <span>Daily Schedule: 6:00 AM - 9:00 PM</span>
+            <Badge variant="outline" className="ml-auto text-xs">
+              {place.driveTimeMinutes || 60} min drive
+            </Badge>
           </div>
         </div>
         
-        {primaryPlace && (
-          <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <Clock className="w-4 h-4" />
-              <span>6:00 AM - 9:00 PM</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Car className="w-4 h-4" />
-              <span>{primaryPlace.driveTimeMinutes || 60} min drive</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <MapPin className="w-4 h-4" />
-              <span>{primaryPlace.distanceMiles || '?'} miles</span>
-            </div>
-          </div>
-        )}
-      </div>
-      
-      {expanded && schedule.length > 0 && (
-        <div className="border-t border-white/10 p-6 bg-white/5">
-          <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-primary" />
-            Hour-by-Hour Schedule
-          </h4>
-          <div className="space-y-3">
+        <ScrollArea className="h-[400px] px-6">
+          <div className="space-y-3 pb-6">
             {schedule.map((item, index) => {
               const Icon = item.icon;
               return (
                 <div
                   key={index}
                   className={`p-4 rounded-xl border ${getTypeColor(item.type)}`}
-                  data-testid={`plan-schedule-item-${index}`}
+                  data-testid={`schedule-item-${index}`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
@@ -324,84 +363,31 @@ function PlanCard({ plan, places, onDelete }: PlanCardProps) {
               );
             })}
           </div>
+        </ScrollArea>
+        
+        <div className="p-6 pt-4 border-t border-white/10 flex justify-end gap-3">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            data-testid="button-cancel-plan"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCreatePlan}
+            disabled={createPlan.isPending}
+            className="gap-2"
+            data-testid="button-confirm-plan"
+          >
+            {createPlan.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Check className="w-4 h-4" />
+            )}
+            Add to Plan
+          </Button>
         </div>
-      )}
-      
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this plan?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will remove your plan for {formattedDate}. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-500 hover:bg-red-600"
-              onClick={() => onDelete(plan.id)}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Card>
-  );
-}
-
-export default function Planner() {
-  const { data: plans, isLoading } = usePlans();
-  const { data: places = [] } = useQuery<Place[]>({
-    queryKey: ['/api/places'],
-  });
-  const deletePlan = useDeletePlan();
-
-  const handleDeletePlan = (id: number) => {
-    deletePlan.mutate(id);
-  };
-
-  const sortedPlans = plans?.slice().sort((a, b) => 
-    new Date(a.planDate).getTime() - new Date(b.planDate).getTime()
-  ) || [];
-
-  return (
-    <div className="min-h-screen bg-background">
-      <Navbar onUploadClick={() => {}} />
-      
-      <main className="container mx-auto px-4 pt-8 pb-12">
-        <div className="flex justify-between items-center mb-8 gap-4 flex-wrap">
-          <h1 className="text-3xl font-display font-bold text-white">Your Weekend Plans</h1>
-          <Badge variant="outline" className="text-sm">
-            {sortedPlans.length} plan{sortedPlans.length !== 1 ? 's' : ''}
-          </Badge>
-        </div>
-
-        {isLoading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="w-8 h-8 text-primary animate-spin" />
-          </div>
-        ) : !sortedPlans.length ? (
-          <div className="text-center py-20 bg-card rounded-3xl border border-white/5">
-            <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Calendar className="w-8 h-8 text-primary" />
-            </div>
-            <h3 className="text-xl font-bold text-white mb-2">No plans yet</h3>
-            <p className="text-muted-foreground">Start by exploring destinations and adding them to a plan.</p>
-          </div>
-        ) : (
-          <div className="grid gap-4">
-            {sortedPlans.map((plan) => (
-              <PlanCard
-                key={plan.id}
-                plan={plan}
-                places={places}
-                onDelete={handleDeletePlan}
-              />
-            ))}
-          </div>
-        )}
-      </main>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

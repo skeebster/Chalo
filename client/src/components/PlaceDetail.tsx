@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MapPin, Calendar, Clock, DollarSign, ExternalLink, ThumbsUp, ThumbsDown, Car, Info, Lightbulb, Star, Utensils, Zap, ParkingCircle, Sun, CheckCircle2, MessageCircle, TrendingUp, Sparkles, AlertCircle, Train, Heart, Camera, ChevronLeft, ChevronRight, Check, Loader2 } from "lucide-react";
+import { MapPin, Calendar, Clock, DollarSign, ExternalLink, ThumbsUp, ThumbsDown, Car, Info, Lightbulb, Star, Utensils, Zap, ParkingCircle, Sun, CheckCircle2, MessageCircle, TrendingUp, Sparkles, AlertCircle, Train, Heart, Camera, ChevronLeft, ChevronRight, Check, Loader2, Mountain } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { NearbyRestaurant } from "@shared/schema";
 import { getDisplayImageUrl, DEFAULT_PLACE_IMAGE } from "@/lib/image-utils";
+import { AddToPlanDialog } from "./AddToPlanDialog";
 
 interface PlacePhoto {
   photoReference: string;
@@ -120,6 +121,7 @@ function getSentimentBgColor(score: number): string {
 export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
   const [showPhotoGallery, setShowPhotoGallery] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [showAddToPlan, setShowAddToPlan] = useState(false);
 
   const { data: reviewData, isLoading: reviewsLoading } = useQuery<ReviewAnalysis>({
     queryKey: ['/api/places', place?.id, 'reviews'],
@@ -587,6 +589,67 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
               </div>
             </section>
 
+            {/* AllTrails Section for Nature Places */}
+            {(place as any).recommendedTrails && (place as any).recommendedTrails.length > 0 && (
+              <>
+                <Separator className="bg-white/10" />
+                <section>
+                  <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                    <Mountain className="w-5 h-5 text-primary" /> Recommended Trails
+                    <Badge variant="outline" className="text-xs ml-auto">via AllTrails</Badge>
+                  </h3>
+                  <div className="grid gap-3">
+                    {((place as any).recommendedTrails as Array<{name: string, rating: number, difficulty: string, length: string, url: string}>).map((trail, i) => (
+                      <div 
+                        key={i} 
+                        className="flex items-start gap-3 bg-white/5 p-4 rounded-lg border border-white/5 hover-elevate cursor-pointer"
+                        onClick={() => window.open(trail.url, '_blank')}
+                        data-testid={`trail-card-${i}`}
+                      >
+                        <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
+                          <Mountain className="w-5 h-5 text-green-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-white">{trail.name}</span>
+                            <div className="flex items-center gap-1">
+                              <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                              <span className="text-xs text-yellow-400">{trail.rating}</span>
+                            </div>
+                            <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <Badge 
+                              variant="outline" 
+                              className={`text-xs ${
+                                trail.difficulty === 'Easy' ? 'bg-green-500/20 border-green-500/30 text-green-400' :
+                                trail.difficulty === 'Moderate' ? 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400' :
+                                'bg-red-500/20 border-red-500/30 text-red-400'
+                              }`}
+                            >
+                              {trail.difficulty}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">{trail.length}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {(place as any).alltrailsUrl && (
+                    <Button 
+                      variant="outline" 
+                      className="mt-3 w-full gap-2" 
+                      onClick={() => window.open((place as any).alltrailsUrl, '_blank')}
+                      data-testid="button-view-all-trails"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      View All Trails on AllTrails
+                    </Button>
+                  )}
+                </section>
+              </>
+            )}
+
             {/* Public Transit */}
             {place.publicTransit && (
               <>
@@ -690,7 +753,7 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
                   Open in Maps
                 </Button>
               )}
-              <Button className="gap-2">
+              <Button className="gap-2" onClick={() => setShowAddToPlan(true)} data-testid="button-add-to-plan">
                 <Calendar className="w-4 h-4" />
                 Add to Plan
               </Button>
@@ -698,6 +761,12 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
           </div>
         </ScrollArea>
       </DialogContent>
+      
+      <AddToPlanDialog
+        place={place}
+        open={showAddToPlan}
+        onOpenChange={setShowAddToPlan}
+      />
     </Dialog>
   );
 }
