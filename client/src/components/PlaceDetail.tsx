@@ -191,6 +191,9 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
   const photos = photosData?.photos || [];
 
   if (!place) return null;
+  
+  // Check if this is a highly-rated place (4.8+)
+  const isHighlyRated = place.googleRating ? parseFloat(place.googleRating) >= 4.8 : false;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -543,8 +546,106 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
 
             <Separator className="bg-white/10" />
 
-            {/* Insider Tips */}
-            {place.insiderTips && (
+            {/* Visit Optimization Section for Top Rated Places (4.8+) */}
+            {isHighlyRated && place.insiderTips && (
+              <>
+                <section>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500/20 to-yellow-500/20 border border-amber-500/30">
+                      <Sparkles className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        Visit Optimization Guide
+                        <Badge className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-bold border-0 text-xs">
+                          Top Rated 4.8+
+                        </Badge>
+                      </h3>
+                      <p className="text-xs text-muted-foreground">Expert tips to maximize your experience</p>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-amber-500/10 to-yellow-500/5 p-5 rounded-xl border border-amber-500/20 space-y-4">
+                    {/* Quick Optimization Tips */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Clock className="w-4 h-4 text-amber-400" />
+                        <span className="font-semibold text-amber-400 text-sm">Timing Strategy</span>
+                      </div>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <div className="bg-black/20 p-3 rounded-lg">
+                          <div className="text-xs text-muted-foreground mb-1">Best Day</div>
+                          <div className="text-sm text-white font-medium">{place.bestDay || "Weekdays for fewer crowds"}</div>
+                        </div>
+                        <div className="bg-black/20 p-3 rounded-lg">
+                          <div className="text-xs text-muted-foreground mb-1">Best Time</div>
+                          <div className="text-sm text-white font-medium">{place.bestTimeOfDay || "Early morning or late afternoon"}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pro Tips */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Lightbulb className="w-4 h-4 text-amber-400" />
+                        <span className="font-semibold text-amber-400 text-sm">Insider Knowledge</span>
+                      </div>
+                      <ul className="space-y-2">
+                        {parseTextToBullets(place.insiderTips).slice(0, 5).map((tip, i) => (
+                          <li key={i} className="flex gap-2 text-sm text-muted-foreground">
+                            <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                            <span>{tip}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Budget Optimization */}
+                    {(place.entryFee || place.averageSpend) && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <DollarSign className="w-4 h-4 text-amber-400" />
+                          <span className="font-semibold text-amber-400 text-sm">Budget Planning</span>
+                        </div>
+                        <div className="bg-black/20 p-3 rounded-lg">
+                          {place.entryFee && (
+                            <div className="text-sm text-muted-foreground mb-1">
+                              <span className="text-white font-medium">Entry:</span> {place.entryFee}
+                            </div>
+                          )}
+                          {place.averageSpend && (
+                            <div className="text-sm text-muted-foreground">
+                              <span className="text-white font-medium">Expect to spend:</span> ~${place.averageSpend} total
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TripAdvisor Rating if available */}
+                    {place.tripadvisorRating && (
+                      <div className="flex items-center gap-3 pt-2 border-t border-amber-500/20">
+                        <div className="flex items-center gap-1 text-sm">
+                          <span className="text-muted-foreground">TripAdvisor:</span>
+                          <span className="font-bold text-white">{place.tripadvisorRating}</span>
+                          <Star className="w-3.5 h-3.5 fill-green-500 text-green-500" />
+                        </div>
+                        <span className="text-muted-foreground text-xs">|</span>
+                        <div className="flex items-center gap-1 text-sm">
+                          <span className="text-muted-foreground">Google:</span>
+                          <span className="font-bold text-white">{place.googleRating}</span>
+                          <Star className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+                <Separator className="bg-white/10" />
+              </>
+            )}
+
+            {/* Standard Insider Tips (for places under 4.8 rating) */}
+            {!isHighlyRated && place.insiderTips && (
               <section>
                 <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
                   <Lightbulb className="w-5 h-5 text-primary" /> Insider Tips

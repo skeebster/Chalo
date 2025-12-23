@@ -12,13 +12,21 @@ interface PlaceCardProps {
 export function PlaceCard({ place, onClick }: PlaceCardProps) {
   // Use a fallback image if none provided
   const image = getDisplayImageUrl(place.imageUrl, DEFAULT_PLACE_IMAGE);
+  
+  // Check if this is a highly-rated place (4.8+)
+  const isHighlyRated = place.googleRating ? parseFloat(place.googleRating) >= 4.8 : false;
 
   return (
     <motion.div
       whileHover={{ y: -5 }}
       transition={{ type: "spring", stiffness: 300 }}
       onClick={onClick}
-      className="group cursor-pointer bg-card rounded-2xl overflow-hidden border border-border/50 hover:border-primary/50 shadow-lg hover:shadow-xl hover:shadow-primary/5 transition-all h-full flex flex-col"
+      className={`group cursor-pointer bg-card rounded-2xl overflow-hidden border shadow-lg transition-all h-full flex flex-col ${
+        isHighlyRated 
+          ? "border-amber-500/30 hover:border-amber-400/60 hover:shadow-xl hover:shadow-amber-500/20 ring-1 ring-amber-500/10 hover:ring-amber-400/30" 
+          : "border-border/50 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5"
+      }`}
+      data-testid={`card-place-${place.id}`}
     >
       <div className="relative h-48 overflow-hidden">
         <img
@@ -28,7 +36,12 @@ export function PlaceCard({ place, onClick }: PlaceCardProps) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60" />
         
-        <div className="absolute top-3 right-3">
+        <div className="absolute top-3 right-3 flex gap-2">
+          {isHighlyRated && (
+            <Badge className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-bold border-0">
+              Top Rated
+            </Badge>
+          )}
           <Badge variant="secondary" className="bg-black/50 backdrop-blur-md border-white/10 text-white hover:bg-black/60">
             {place.category || "General"}
           </Badge>
