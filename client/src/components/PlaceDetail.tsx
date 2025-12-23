@@ -682,7 +682,7 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
                   <InfoCard icon={ParkingCircle} label="Parking" value={place.parkingInfo} />
                 )}
                 {place.evCharging && (
-                  <InfoCard icon={Zap} label="EV Charging" value={place.evCharging} />
+                  <EVChargingCard evCharging={place.evCharging} />
                 )}
                 {place.averageVisitDuration && (
                   <InfoCard icon={Clock} label="Visit Duration" value={place.averageVisitDuration} />
@@ -898,6 +898,142 @@ function InfoCard({ icon: Icon, label, value }: { icon: any, label: string, valu
         <div className="flex-1 min-w-0">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-1">{label}</span>
           <p className="text-sm text-white leading-relaxed">{value}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EVChargingCard({ evCharging }: { evCharging: string }) {
+  const openGoogleMaps = (searchQuery: string) => {
+    const query = encodeURIComponent(searchQuery);
+    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+  };
+
+  // More robust parsing that handles multiple formats:
+  // - "Tesla Supercharger at 909 Route 33 Wawa, Freehold (1.5 mi, 8 stalls)"
+  // - "Tesla Supercharger - Menlo Park Mall"  
+  // - "Nearest: Tesla Supercharger at Some Address (details)"
+  const renderEvText = () => {
+    const elements: JSX.Element[] = [];
+    
+    // Pattern 1: "at [address] (details)" - most common
+    // Pattern 2: "at [address]." or "at [address]" at end
+    // Pattern 3: "- [location name]" or "– [location name]"
+    const patterns = [
+      // Match "at address (details)" or "at address." or "at address" at end
+      /\bat\s+([^(.\n]+?)(?:\s*\(([^)]+)\)|(?=\.|Also|Nearest|Alternate|\s*$))/gi,
+      // Match "- location" or "– location" 
+      /[-–]\s+([A-Z][^(.\n]+?)(?:\s*\(([^)]+)\)|(?=\.|Also|Nearest|Alternate|\s*$))/gi,
+    ];
+    
+    let processedText = evCharging;
+    let matchCount = 0;
+    
+    // First pattern: "at [address]"
+    const atPattern = /\bat\s+([^(.\n]+?)(?:\s*\(([^)]+)\)|(?=\.|\s*$))/gi;
+    const parts: { start: number; end: number; prefix: string; address: string; details?: string }[] = [];
+    
+    let match;
+    while ((match = atPattern.exec(evCharging)) !== null) {
+      const address = match[1].trim();
+      const details = match[2];
+      if (address.length > 3 && !address.match(/^\d+$/)) {
+        parts.push({
+          start: match.index,
+          end: match.index + match[0].length,
+          prefix: "at ",
+          address,
+          details
+        });
+      }
+    }
+    
+    // Also check for "- Location Name" pattern
+    const dashPattern = /[-–]\s+([A-Z][^(.\n]+?)(?:\s*\(([^)]+)\)|(?=\.|\s*$))/gi;
+    while ((match = dashPattern.exec(evCharging)) !== null) {
+      const location = match[1].trim();
+      const details = match[2];
+      if (location.length > 3 && !parts.some(p => p.start <= match!.index && p.end >= match!.index)) {
+        parts.push({
+          start: match.index,
+          end: match.index + match[0].length,
+          prefix: "- ",
+          address: location,
+          details
+        });
+      }
+    }
+    
+    // Sort by position
+    parts.sort((a, b) => a.start - b.start);
+    
+    if (parts.length === 0) {
+      // No matches found - make the whole thing clickable if it looks like a charger description
+      if (evCharging.toLowerCase().includes('supercharger') || evCharging.toLowerCase().includes('charger')) {
+        return (
+          <button
+            onClick={() => openGoogleMaps(evCharging.split('(')[0].trim() + " Tesla Supercharger")}
+            className="text-green-400 hover:text-green-300 underline underline-offset-2 transition-colors text-left"
+            data-testid="link-ev-charger-0"
+          >
+            {evCharging}
+          </button>
+        );
+      }
+      return <span>{evCharging}</span>;
+    }
+    
+    // Build elements from parts
+    let lastEnd = 0;
+    parts.forEach((part, idx) => {
+      // Add text before this match
+      if (part.start > lastEnd) {
+        elements.push(<span key={`text-${idx}`}>{evCharging.substring(lastEnd, part.start)}</span>);
+      }
+      
+      // Add the prefix
+      elements.push(<span key={`prefix-${idx}`}>{part.prefix}</span>);
+      
+      // Add the clickable address
+      elements.push(
+        <button
+          key={`link-${idx}`}
+          onClick={() => openGoogleMaps(part.address + " Tesla Supercharger")}
+          className="text-green-400 hover:text-green-300 underline underline-offset-2 transition-colors"
+          data-testid={`link-ev-charger-${idx}`}
+        >
+          {part.address}
+        </button>
+      );
+      
+      // Add details if present
+      if (part.details) {
+        elements.push(<span key={`details-${idx}`} className="text-muted-foreground"> ({part.details})</span>);
+      }
+      
+      lastEnd = part.end;
+    });
+    
+    // Add remaining text
+    if (lastEnd < evCharging.length) {
+      elements.push(<span key="remaining">{evCharging.substring(lastEnd)}</span>);
+    }
+    
+    return <>{elements}</>;
+  };
+
+  return (
+    <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-xl">
+      <div className="flex items-start gap-3">
+        <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center shrink-0">
+          <Zap className="w-4 h-4 text-green-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <span className="text-xs font-medium text-green-400 uppercase tracking-wide block mb-1">Tesla Supercharger</span>
+          <p className="text-sm text-white leading-relaxed">
+            {renderEvText()}
+          </p>
         </div>
       </div>
     </div>
