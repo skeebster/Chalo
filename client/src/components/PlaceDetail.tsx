@@ -17,6 +17,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { NearbyRestaurant } from "@shared/schema";
 import { getDisplayImageUrl, DEFAULT_PLACE_IMAGE } from "@/lib/image-utils";
 import { AddToPlanDialog } from "./AddToPlanDialog";
+import { NearbyPlaces } from "./NearbyPlaces";
+import { usePlaces } from "@/hooks/use-places";
 
 interface PlacePhoto {
   photoReference: string;
@@ -165,6 +167,8 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
   const { data: favorites = [] } = useQuery<number[]>({
     queryKey: ['/api/favorites'],
   });
+
+  const { data: allPlaces = [] } = usePlaces();
 
   const isFavorite = place ? favorites.includes(place.id) : false;
 
@@ -872,6 +876,24 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
                     <p className="text-sm text-muted-foreground italic">"{place.overallSentiment}"</p>
                   </div>
                 </section>
+              </>
+            )}
+
+            {/* Nearby Places */}
+            {place && allPlaces && allPlaces.length > 0 && (
+              <>
+                <Separator className="bg-white/10" />
+                <NearbyPlaces
+                  currentPlace={place}
+                  allPlaces={allPlaces}
+                  onPlaceClick={(nearbyPlace) => {
+                    onOpenChange(false);
+                    setTimeout(() => {
+                      const event = new CustomEvent('openPlaceDetail', { detail: nearbyPlace });
+                      window.dispatchEvent(event);
+                    }, 100);
+                  }}
+                />
               </>
             )}
 

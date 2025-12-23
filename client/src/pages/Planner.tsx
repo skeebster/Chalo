@@ -3,7 +3,7 @@ import { usePlans, useDeletePlan } from "@/hooks/use-plans";
 import { useQuery } from "@tanstack/react-query";
 import { Place } from "@shared/schema";
 import { useState } from "react";
-import { Loader2, Calendar, Clock, Car, Coffee, Utensils, MapPin, Sun, Moon, Home, Trash2, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
+import { Loader2, Calendar, Clock, Car, Coffee, Utensils, MapPin, Sun, Moon, Home, Trash2, ChevronDown, ChevronUp, Sparkles, Share2, Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -312,6 +312,43 @@ interface PlanCardProps {
 function PlanCard({ plan, places, onDelete }: PlanCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+
+  const handleShare = async () => {
+    if (shareUrl) {
+      await copyToClipboard();
+      return;
+    }
+    
+    setIsSharing(true);
+    try {
+      const response = await fetch(`/api/plans/${plan.id}/share`, {
+        method: 'POST',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const fullUrl = window.location.origin + data.shareUrl;
+        setShareUrl(fullUrl);
+        await navigator.clipboard.writeText(fullUrl);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      }
+    } catch (error) {
+      console.error('Failed to share plan:', error);
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const copyToClipboard = async () => {
+    if (shareUrl) {
+      await navigator.clipboard.writeText(shareUrl);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    }
+  };
   
   // Get places in order (use order field if available)
   const planPlaces = (plan.places || [])
@@ -365,6 +402,24 @@ function PlanCard({ plan, places, onDelete }: PlanCardProps) {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleShare}
+              disabled={isSharing}
+              className={isCopied ? "text-green-400" : "text-muted-foreground"}
+              data-testid={`button-share-plan-${plan.id}`}
+            >
+              {isSharing ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : isCopied ? (
+                <Check className="w-4 h-4" />
+              ) : shareUrl ? (
+                <Copy className="w-4 h-4" />
+              ) : (
+                <Share2 className="w-4 h-4" />
+              )}
+            </Button>
             <Button
               variant="ghost"
               size="icon"

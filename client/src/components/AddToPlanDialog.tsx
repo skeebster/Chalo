@@ -6,7 +6,8 @@ import { Place, WeekendPlan } from "@shared/schema";
 import { useCreatePlan } from "@/hooks/use-plans";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo, useEffect } from "react";
-import { Calendar, CalendarPlus, Clock, Car, Coffee, Utensils, MapPin, Sun, Moon, Home, Loader2, Check, ChevronLeft, ChevronRight, Plus, X, GripVertical, ArrowUp, ArrowDown, Sparkles } from "lucide-react";
+import { Calendar, CalendarPlus, Clock, Car, Coffee, Utensils, MapPin, Sun, Moon, Home, Loader2, Check, ChevronLeft, ChevronRight, Plus, X, GripVertical, ArrowUp, ArrowDown, Sparkles, Backpack } from "lucide-react";
+import { PackingChecklist } from "./PackingChecklist";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { format, addDays, nextSaturday, isSaturday, isSunday, startOfDay, addMinutes, setHours, setMinutes } from "date-fns";
@@ -349,6 +350,7 @@ export function AddToPlanDialog({ place, open, onOpenChange }: AddToPlanDialogPr
   const [isSaturdaySelected, setIsSaturdaySelected] = useState(true);
   const [plannedPlaces, setPlannedPlaces] = useState<PlannedPlace[]>([]);
   const [showPlaceSelector, setShowPlaceSelector] = useState(false);
+  const [showPackingChecklist, setShowPackingChecklist] = useState(false);
   
   // Fetch all places for the selector
   const { data: allPlaces = [] } = useQuery<Place[]>({
@@ -757,7 +759,17 @@ export function AddToPlanDialog({ place, open, onOpenChange }: AddToPlanDialogPr
         
         {/* Footer Actions */}
         <div className="p-6 pt-4 border-t border-white/10 bg-card">
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowPackingChecklist(true)}
+              disabled={plannedPlaces.length === 0}
+              data-testid="button-packing-checklist"
+              title="Packing Checklist"
+            >
+              <Backpack className="w-4 h-4" />
+            </Button>
             <Button
               variant="outline"
               className="flex-1"
@@ -805,6 +817,13 @@ export function AddToPlanDialog({ place, open, onOpenChange }: AddToPlanDialogPr
           </div>
         </div>
       </DialogContent>
+
+      {/* Packing Checklist Modal */}
+      <PackingChecklist
+        places={plannedPlaces.map(p => p.place)}
+        open={showPackingChecklist}
+        onOpenChange={setShowPackingChecklist}
+      />
     </Dialog>
   );
 }

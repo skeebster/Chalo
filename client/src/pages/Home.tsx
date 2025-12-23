@@ -6,6 +6,7 @@ import { PlaceCard } from "@/components/PlaceCard";
 import { PlaceDetail } from "@/components/PlaceDetail";
 import { AddPlaceModal } from "@/components/AddPlaceModal";
 import { FilterPanel } from "@/components/FilterPanel";
+import { SeasonalHighlights } from "@/components/SeasonalHighlights";
 import { usePlaces, useImportSampleData, PlaceFilters } from "@/hooks/use-places";
 import { Place } from "@shared/schema";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,14 @@ export default function Home() {
           onSearch={handleSearch} 
           onUploadClick={() => setIsUploadOpen(true)} 
         />
+
+        {/* Seasonal Highlights - show when not filtering */}
+        {!filters.search && filters.category === 'all' && places && places.length > 0 && (
+          <SeasonalHighlights 
+            places={places} 
+            onPlaceClick={setSelectedPlace} 
+          />
+        )}
 
         <div className="space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

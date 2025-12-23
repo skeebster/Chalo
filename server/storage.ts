@@ -18,7 +18,6 @@ export interface PlaceFilterOptions {
   indoorOutdoor?: 'indoor' | 'outdoor' | 'all';
   maxDistance?: number;
   minRating?: number;
-  wheelchairAccessible?: boolean;
   favoriteIds?: number[];
 }
 
@@ -38,8 +37,11 @@ export interface IStorage {
 
   // Weekend Plans
   getPlans(): Promise<WeekendPlan[]>;
+  getWeekendPlanById(id: number): Promise<WeekendPlan | undefined>;
+  getWeekendPlanByShareCode(shareCode: string): Promise<WeekendPlan | undefined>;
   createPlan(plan: InsertWeekendPlan): Promise<WeekendPlan>;
   updatePlan(id: number, updates: Partial<InsertWeekendPlan>): Promise<WeekendPlan>;
+  updateWeekendPlan(id: number, updates: Partial<InsertWeekendPlan>): Promise<WeekendPlan>;
   deletePlan(id: number): Promise<void>;
 
   // Preferences
@@ -96,10 +98,6 @@ export class DatabaseStorage implements IStorage {
 
     if (filters?.minRating) {
       conditions.push(gte(places.googleRating, filters.minRating.toString()));
-    }
-
-    if (filters?.wheelchairAccessible) {
-      conditions.push(eq(places.wheelchairAccessible, true));
     }
 
     if (filters?.favoriteIds && filters.favoriteIds.length > 0) {
@@ -186,8 +184,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updatePlan(id: number, updates: Partial<InsertWeekendPlan>): Promise<WeekendPlan> {
+    // Preserve shareCode when updating - never clear it unless explicitly set to null
+    const existingPlan = await this.getWeekendPlanById(id);
+    const updateData = { ...updates, updatedAt: new Date() };
+    if (existingPlan?.shareCode && !('shareCode' in updates)) {
+      (updateData as any).shareCode = existingPlan.shareCode;
+    }
     const [updated] = await db.update(weekendPlans)
-      .set({ ...updates, updatedAt: new Date() })
+      .set(updateData)
       .where(eq(weekendPlans.id, id))
       .returning();
     return updated;
@@ -195,6 +199,24 @@ export class DatabaseStorage implements IStorage {
 
   async deletePlan(id: number): Promise<void> {
     await db.delete(weekendPlans).where(eq(weekendPlans.id, id));
+  }
+
+  async getWeekendPlanById(id: number): Promise<WeekendPlan | undefined> {
+    const [plan] = await db.select().from(weekendPlans).where(eq(weekendPlans.id, id));
+    return plan;
+  }
+
+  async getWeekendPlanByShareCode(shareCode: string): Promise<WeekendPlan | undefined> {
+    const [plan] = await db.select().from(weekendPlans).where(eq(weekendPlans.shareCode, shareCode));
+    return plan;
+  }
+
+  async updateWeekendPlan(id: number, updates: Partial<InsertWeekendPlan>): Promise<WeekendPlan> {
+    const [updated] = await db.update(weekendPlans)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(weekendPlans.id, id))
+      .returning();
+    return updated;
   }
 
   // === Preferences ===

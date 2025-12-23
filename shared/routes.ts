@@ -122,6 +122,25 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    share: {
+      method: 'POST' as const,
+      path: '/api/plans/:id/share',
+      responses: {
+        200: z.object({ shareCode: z.string(), shareUrl: z.string() }),
+        404: errorSchemas.notFound,
+      },
+    },
+    getShared: {
+      method: 'GET' as const,
+      path: '/api/shared/:shareCode',
+      responses: {
+        200: z.object({
+          plan: z.custom<typeof weekendPlans.$inferSelect>(),
+          places: z.array(z.custom<typeof places.$inferSelect>()),
+        }),
+        404: errorSchemas.notFound,
+      },
+    },
   },
   preferences: {
     get: {

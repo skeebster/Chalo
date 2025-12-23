@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/Home";
 import Planner from "@/pages/Planner";
+import SharedPlan from "@/pages/SharedPlan";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -12,7 +13,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/planner" component={Planner} />
-      {/* Settings page could be added here */}
+      <Route path="/shared/:shareCode" component={SharedPlan} />
       <Route component={NotFound} />
     </Switch>
   );

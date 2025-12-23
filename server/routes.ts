@@ -1517,6 +1517,65 @@ export async function registerRoutes(
     }
   });
 
+  // Generate share link for a plan
+  app.post("/api/plans/:id/share", async (req, res) => {
+    try {
+      const planId = parseInt(req.params.id);
+      const plan = await storage.getWeekendPlanById(planId);
+      
+      if (!plan) {
+        return res.status(404).json({ error: "Plan not found" });
+      }
+      
+      // Generate or return existing share code
+      let shareCode = plan.shareCode;
+      if (!shareCode) {
+        // Generate unique share code with collision check
+        let attempts = 0;
+        do {
+          shareCode = Math.random().toString(36).substring(2, 10) + Date.now().toString(36).slice(-4);
+          const existing = await storage.getWeekendPlanByShareCode(shareCode);
+          if (!existing) break;
+          attempts++;
+        } while (attempts < 5);
+        
+        await storage.updateWeekendPlan(planId, { shareCode });
+      }
+      
+      const shareUrl = `/shared/${shareCode}`;
+      res.json({ shareCode, shareUrl });
+    } catch (error: any) {
+      console.error("Share link error:", error);
+      res.status(500).json({ error: "Failed to generate share link" });
+    }
+  });
+
+  // Get shared plan by share code (public endpoint)
+  app.get("/api/shared/:shareCode", async (req, res) => {
+    try {
+      const { shareCode } = req.params;
+      const plan = await storage.getWeekendPlanByShareCode(shareCode);
+      
+      if (!plan) {
+        return res.status(404).json({ error: "Shared plan not found" });
+      }
+      
+      // Get all places referenced in the plan
+      const placeIds = (plan.places as Array<{placeId: number}>).map(p => p.placeId);
+      const places = await Promise.all(
+        placeIds.map(id => storage.getPlace(id))
+      );
+      
+      res.json({
+        plan,
+        places: places.filter(Boolean),
+      });
+    } catch (error: any) {
+      console.error("Get shared plan error:", error);
+      res.status(500).json({ error: "Failed to get shared plan" });
+    }
+  });
+
   return httpServer;
 }
 

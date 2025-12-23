@@ -98,6 +98,7 @@ export const weekendPlans = pgTable("weekend_plans", {
   places: jsonb("places").$type<Array<{placeId: number, time?: string, notes?: string}>>().default([]),
   notes: text("notes"),
   status: text("status").default('planned'), // planned, completed, cancelled
+  shareCode: text("share_code"), // Unique code for public sharing
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
