@@ -7,7 +7,7 @@ import OpenAI from "openai";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
-import { getReviewAnalysis, lookupPlaceFromUrl, lookupPlaceByName, processVoiceTranscript, fetchPlacePhotos, PlacePhoto, enrichPlaceData } from "./google-places";
+import { getReviewAnalysis, lookupPlaceFromUrl, lookupPlaceByName, processVoiceTranscript, fetchPlacePhotos, PlacePhoto, enrichPlaceData, calculateDrivingDistance } from "./google-places";
 import type { InsertPlace, Place, UpdatePlaceRequest } from "@shared/schema";
 
 // Fields to always preserve from existing (user-generated data)
@@ -874,6 +874,63 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error enriching places:", error);
       res.status(500).json({ success: false, message: "Failed to enrich places" });
+    }
+  });
+
+  // === Force Recalculate All Drive Times ===
+  app.post("/api/places/recalculate-drive-times", async (req, res) => {
+    try {
+      const allPlaces = await storage.getPlaces();
+      const results: { id: number; name: string; distance: number; driveTime: number }[] = [];
+      let updatedCount = 0;
+      let errorCount = 0;
+      
+      for (const place of allPlaces) {
+        try {
+          if (!place.address) {
+            console.log(`Skipping ${place.name}: no address`);
+            continue;
+          }
+          
+          // Force recalculate using OSRM (no existing distance passed)
+          const result = await calculateDrivingDistance(place.address);
+          
+          if (result) {
+            await storage.updatePlace(place.id, {
+              distanceMiles: result.distanceMiles.toString(),
+              driveTimeMinutes: result.driveTimeMinutes,
+            });
+            results.push({ 
+              id: place.id, 
+              name: place.name, 
+              distance: result.distanceMiles,
+              driveTime: result.driveTimeMinutes 
+            });
+            updatedCount++;
+            console.log(`Updated ${place.name}: ${result.distanceMiles} mi, ${result.driveTimeMinutes} min`);
+          } else {
+            console.log(`Could not calculate route for ${place.name}`);
+            errorCount++;
+          }
+          
+          // Small delay to avoid rate limiting on OSRM
+          await new Promise(resolve => setTimeout(resolve, 300));
+        } catch (error) {
+          console.error(`Error recalculating ${place.name}:`, error);
+          errorCount++;
+        }
+      }
+      
+      res.json({ 
+        success: true, 
+        totalPlaces: allPlaces.length,
+        updatedCount,
+        errorCount,
+        results
+      });
+    } catch (error) {
+      console.error("Error recalculating drive times:", error);
+      res.status(500).json({ success: false, message: "Failed to recalculate drive times" });
     }
   });
 

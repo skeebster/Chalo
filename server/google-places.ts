@@ -841,68 +841,83 @@ export function calculateDriveTimeFromDistance(distanceMiles: number): number {
   return Math.round((distanceMiles / AVERAGE_SPEED_MPH) * 60);
 }
 
-// Calculate driving distance and time from home to a destination using legacy Distance Matrix API
-// Falls back to heuristic calculation if API is unavailable
-export async function calculateDrivingDistance(destinationAddress: string, existingDistanceMiles?: number): Promise<DistanceResult | null> {
-  if (!GOOGLE_PLACES_API_KEY) {
-    console.log("Google Places API key not configured for distance calculation");
-    // Fallback: if we already have distance, calculate drive time from it
-    if (existingDistanceMiles && existingDistanceMiles > 0) {
-      const driveTimeMinutes = calculateDriveTimeFromDistance(existingDistanceMiles);
-      console.log(`Using heuristic: ${existingDistanceMiles} miles = ${driveTimeMinutes} min`);
-      return { distanceMiles: existingDistanceMiles, driveTimeMinutes };
-    }
-    return null;
-  }
+// Home coordinates (8 Canvass Ct, Somerset, NJ 08873)
+const HOME_COORDS = { lat: 40.4976, lng: -74.4885 };
 
-  const params = new URLSearchParams({
-    origins: HOME_ADDRESS,
-    destinations: destinationAddress,
-    mode: "driving",
-    units: "imperial",
-    key: GOOGLE_PLACES_API_KEY,
-  });
-  
-  const url = `https://maps.googleapis.com/maps/api/distancematrix/json?${params}`;
+// Get coordinates for an address using Google Places Text Search
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  if (!GOOGLE_PLACES_API_KEY) return null;
   
   try {
+    const url = "https://places.googleapis.com/v1/places:searchText";
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+        "X-Goog-FieldMask": "places.location",
+      },
+      body: JSON.stringify({ textQuery: address }),
+    });
+    
+    const data = await response.json();
+    if (data.places?.[0]?.location) {
+      return {
+        lat: data.places[0].location.latitude,
+        lng: data.places[0].location.longitude,
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error("Geocode error:", error);
+    return null;
+  }
+}
+
+// Use OSRM (free, no API key) to get driving distance and time
+async function getOSRMRoute(startLng: number, startLat: number, endLng: number, endLat: number): Promise<DistanceResult | null> {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=false`;
     const response = await fetch(url);
     const data = await response.json();
     
-    if (data.status === "OK" && data.rows?.[0]?.elements?.[0]?.status === "OK") {
-      const element = data.rows[0].elements[0];
-      
-      // Distance comes in meters, convert to miles
-      const distanceMeters = element.distance.value;
-      const distanceMiles = Math.round((distanceMeters / 1609.34) * 10) / 10;
-      
-      // Duration comes in seconds, convert to minutes
-      const durationSeconds = element.duration.value;
-      const driveTimeMinutes = Math.round(durationSeconds / 60);
-      
-      console.log(`Distance to ${destinationAddress}: ${distanceMiles} miles, ${driveTimeMinutes} min`);
+    if (data.code === "Ok" && data.routes?.[0]) {
+      const route = data.routes[0];
+      const distanceMiles = Math.round((route.distance / 1609.34) * 10) / 10;
+      const driveTimeMinutes = Math.round(route.duration / 60);
       return { distanceMiles, driveTimeMinutes };
     }
-    
-    // API failed - use heuristic fallback if we have existing distance
-    console.log("Distance Matrix API unavailable for:", destinationAddress, data.status);
-    if (existingDistanceMiles && existingDistanceMiles > 0) {
-      const driveTimeMinutes = calculateDriveTimeFromDistance(existingDistanceMiles);
-      console.log(`Fallback heuristic: ${existingDistanceMiles} miles = ${driveTimeMinutes} min`);
-      return { distanceMiles: existingDistanceMiles, driveTimeMinutes };
-    }
-    
     return null;
   } catch (error) {
-    console.error("Error calculating driving distance:", error);
-    // Fallback on error too
-    if (existingDistanceMiles && existingDistanceMiles > 0) {
-      const driveTimeMinutes = calculateDriveTimeFromDistance(existingDistanceMiles);
-      console.log(`Error fallback: ${existingDistanceMiles} miles = ${driveTimeMinutes} min`);
-      return { distanceMiles: existingDistanceMiles, driveTimeMinutes };
-    }
+    console.error("OSRM error:", error);
     return null;
   }
+}
+
+// Calculate driving distance and time from home to a destination
+// Uses Google Places for geocoding + OSRM for routing (free, accurate)
+export async function calculateDrivingDistance(destinationAddress: string, existingDistanceMiles?: number): Promise<DistanceResult | null> {
+  // First, geocode the destination address to get coordinates
+  const destCoords = await geocodeAddress(destinationAddress);
+  
+  if (destCoords) {
+    // Use OSRM for accurate routing (free, no API key needed)
+    const result = await getOSRMRoute(HOME_COORDS.lng, HOME_COORDS.lat, destCoords.lng, destCoords.lat);
+    if (result) {
+      console.log(`OSRM route to ${destinationAddress}: ${result.distanceMiles} miles, ${result.driveTimeMinutes} min`);
+      return result;
+    }
+  }
+  
+  // Fallback to heuristic if routing fails and we have existing distance
+  if (existingDistanceMiles && existingDistanceMiles > 1) {
+    const driveTimeMinutes = calculateDriveTimeFromDistance(existingDistanceMiles);
+    console.log(`Heuristic fallback: ${existingDistanceMiles} miles = ${driveTimeMinutes} min`);
+    return { distanceMiles: existingDistanceMiles, driveTimeMinutes };
+  }
+  
+  console.log(`Cannot calculate distance for: ${destinationAddress}`);
+  return null;
 }
 
 export interface EnrichmentResult {
