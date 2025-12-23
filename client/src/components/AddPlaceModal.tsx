@@ -70,7 +70,15 @@ export function AddPlaceModal({ open, onOpenChange, onSuccess }: Props) {
         recognitionRef.current.onerror = (event: any) => {
           console.error('Speech recognition error:', event.error);
           setIsRecording(false);
-          setVoiceError(`Voice recognition error: ${event.error}`);
+          if (event.error === 'not-allowed') {
+            setVoiceError('Microphone access denied. Please open this app in a new browser tab (click the external link icon), then allow microphone access when prompted.');
+          } else if (event.error === 'no-speech') {
+            setVoiceError('No speech detected. Please speak into your microphone.');
+          } else if (event.error === 'audio-capture') {
+            setVoiceError('No microphone found. Please connect a microphone and try again.');
+          } else {
+            setVoiceError(`Voice recognition error: ${event.error}`);
+          }
         };
 
         recognitionRef.current.onend = () => {
