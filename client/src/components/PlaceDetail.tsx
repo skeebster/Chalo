@@ -149,48 +149,49 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl h-[85vh] p-0 overflow-hidden bg-card border-white/10" aria-describedby={undefined}>
+      <DialogContent className="max-w-3xl h-[90vh] p-0 overflow-hidden bg-card border-white/10" aria-describedby={undefined}>
         <VisuallyHidden>
           <DialogTitle>{place.name}</DialogTitle>
         </VisuallyHidden>
-        <div className="relative h-64 w-full shrink-0">
-          <img 
-            src={place.imageUrl || "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&auto=format&fit=crop&q=60"} 
-            alt={place.name} 
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
-          
-          {/* Favorite Button */}
-          <Button
-            size="icon"
-            variant="ghost"
-            className={`absolute top-4 right-4 bg-black/40 backdrop-blur-sm border border-white/20 ${isFavorite ? 'text-red-500' : 'text-white'}`}
-            onClick={toggleFavorite}
-            data-testid="button-favorite"
-          >
-            <Heart className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
-          </Button>
-          
-          <div className="absolute bottom-4 left-6 right-6">
-            <div className="flex gap-2 mb-2">
-              <Badge className="bg-primary/90 hover:bg-primary">{place.category}</Badge>
-              {place.subcategory && <Badge variant="outline" className="text-white border-white/20 bg-black/40 backdrop-blur-md">{place.subcategory}</Badge>}
-            </div>
-            <h2 className="text-3xl font-display font-bold text-white shadow-sm">{place.name}</h2>
-            {place.address && (
-              <div className="flex items-center gap-2 text-white/80 mt-1 text-sm">
-                <MapPin className="w-4 h-4" />
-                {place.address}
-              </div>
-            )}
-          </div>
-        </div>
-
+        
         <ScrollArea className="h-full">
-          <div className="p-6 space-y-8">
+          {/* Hero Image - scrolls with content */}
+          <div className="relative h-48 sm:h-64 w-full">
+            <img 
+              src={place.imageUrl || "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&auto=format&fit=crop&q=60"} 
+              alt={place.name} 
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
+            
+            {/* Favorite Button */}
+            <Button
+              size="icon"
+              variant="ghost"
+              className={`absolute top-4 right-4 bg-black/40 backdrop-blur-sm border border-white/20 ${isFavorite ? 'text-red-500' : 'text-white'}`}
+              onClick={toggleFavorite}
+              data-testid="button-favorite"
+            >
+              <Heart className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
+            </Button>
+            
+            <div className="absolute bottom-4 left-4 right-4 sm:left-6 sm:right-6">
+              <div className="flex gap-2 mb-2 flex-wrap">
+                <Badge className="bg-primary/90 hover:bg-primary">{place.category}</Badge>
+                {place.subcategory && <Badge variant="outline" className="text-white border-white/20 bg-black/40 backdrop-blur-md">{place.subcategory}</Badge>}
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-display font-bold text-white shadow-sm">{place.name}</h2>
+              {place.address && (
+                <div className="flex items-center gap-2 text-white/80 mt-1 text-xs sm:text-sm">
+                  <MapPin className="w-4 h-4 shrink-0" />
+                  <span className="line-clamp-1">{place.address}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
             {/* Quick Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               <StatBox icon={Clock} label="Drive Time" value={`${place.driveTimeMinutes || '--'} min`} />
               <StatBox icon={Car} label="Distance" value={`${place.distanceMiles || '--'} mi`} />
               <StatBox icon={DollarSign} label="Avg Spend" value={`$${place.averageSpend || '--'}`} />
@@ -242,7 +243,7 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
                   </div>
 
                   {/* Pros and Cons */}
-                  <div className="grid md:grid-cols-2 gap-4 mb-4">
+                  <div className="grid sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
                     {reviewData.insights.pros.length > 0 && (
                       <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-xl">
                         <div className="flex items-center gap-2 mb-3">
@@ -385,7 +386,7 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
               <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                 <Info className="w-5 h-5 text-primary" /> Practical Information
               </h3>
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
                 {place.bestSeasons && (
                   <InfoCard icon={Sun} label="Best Seasons" value={place.bestSeasons} />
                 )}
