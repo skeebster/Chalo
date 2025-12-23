@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { TreePine, Tent, Building2, RollerCoaster, Coffee, Waves, Calendar, Navigation } from "lucide-react";
+import { Compass, Zap, Moon, Leaf, Flame, Heart, Utensils, Wind, Palette, PawPrint } from "lucide-react";
 
 interface CategoriesProps {
   selectedCategory: string;
@@ -8,15 +8,17 @@ interface CategoriesProps {
 
 export function Categories({ selectedCategory, onSelect }: CategoriesProps) {
   const categories = [
-    { id: "all", label: "All Places", icon: CompassIcon },
-    { id: "indoor", label: "Indoor", icon: Building2 },
-    { id: "outdoor", label: "Outdoor", icon: TreePine },
-    { id: "museum", label: "Museums", icon: Building2 },
-    { id: "theme", label: "Theme Parks", icon: RollerCoaster },
-    { id: "dining", label: "Dining", icon: Coffee },
-    { id: "beach", label: "Beach", icon: Waves },
-    { id: "weekend", label: "Weekend Trip", icon: Calendar },
-    { id: "roadtrip", label: "Road Trip", icon: Navigation },
+    { id: "all", label: "All Moods", icon: Compass },
+    { id: "adventurous", label: "Adventurous", icon: Flame },
+    { id: "exercise", label: "Exercise", icon: Zap },
+    { id: "lazy", label: "Lazy", icon: Moon },
+    { id: "chill", label: "Chill", icon: Wind },
+    { id: "nature", label: "Nature", icon: Leaf },
+    { id: "family", label: "Family", icon: Heart },
+    { id: "hungry", label: "Hungry", icon: Utensils },
+    { id: "artistic", label: "Artistic", icon: Palette },
+    { id: "animals", label: "Animals", icon: PawPrint },
+    { id: "beach", label: "Beach", icon: Compass },
   ];
 
   return (
@@ -42,25 +44,5 @@ export function Categories({ selectedCategory, onSelect }: CategoriesProps) {
         );
       })}
     </div>
-  );
-}
-
-function CompassIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
-    </svg>
   );
 }
