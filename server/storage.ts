@@ -81,7 +81,13 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (filters?.indoorOutdoor && filters.indoorOutdoor !== 'all') {
-      conditions.push(eq(places.indoorOutdoor, filters.indoorOutdoor));
+      // Include "both" when filtering for indoor or outdoor
+      conditions.push(
+        or(
+          eq(places.indoorOutdoor, filters.indoorOutdoor),
+          eq(places.indoorOutdoor, 'both')
+        )
+      );
     }
 
     if (filters?.maxDistance) {
