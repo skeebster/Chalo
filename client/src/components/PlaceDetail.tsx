@@ -6,10 +6,20 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MapPin, Calendar, Clock, DollarSign, ExternalLink, ThumbsUp, ThumbsDown, Car, Info, Lightbulb, Star, Utensils, Zap, ParkingCircle, Sun, CheckCircle2, MessageCircle, TrendingUp, Sparkles, AlertCircle, Train, Heart } from "lucide-react";
+import { MapPin, Calendar, Clock, DollarSign, ExternalLink, ThumbsUp, ThumbsDown, Car, Info, Lightbulb, Star, Utensils, Zap, ParkingCircle, Sun, CheckCircle2, MessageCircle, TrendingUp, Sparkles, AlertCircle, Train, Heart, Camera, ChevronLeft, ChevronRight, Check, Loader2 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { NearbyRestaurant } from "@shared/schema";
+import { getDisplayImageUrl, DEFAULT_PLACE_IMAGE } from "@/lib/image-utils";
+
+interface PlacePhoto {
+  photoReference: string;
+  url: string;
+  width: number;
+  height: number;
+  attributions: string[];
+}
 
 interface PlaceDetailProps {
   place: Place | null;
@@ -98,6 +108,7 @@ function getSentimentColor(score: number): string {
   return "text-red-400";
 }
 
+
 function getSentimentBgColor(score: number): string {
   if (score >= 80) return "bg-green-500/20 border-green-500/30";
   if (score >= 60) return "bg-lime-500/20 border-lime-500/30";
@@ -107,9 +118,17 @@ function getSentimentBgColor(score: number): string {
 }
 
 export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
+  const [showPhotoGallery, setShowPhotoGallery] = useState(false);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+
   const { data: reviewData, isLoading: reviewsLoading } = useQuery<ReviewAnalysis>({
     queryKey: ['/api/places', place?.id, 'reviews'],
     enabled: open && !!place?.id,
+  });
+
+  const { data: photosData, isLoading: photosLoading, refetch: fetchPhotos } = useQuery<{ success: boolean; photos?: PlacePhoto[]; error?: string }>({
+    queryKey: ['/api/places', place?.id, 'photos'],
+    enabled: false, // Only fetch when user clicks button
   });
 
   const { data: favorites = [] } = useQuery<number[]>({
@@ -136,6 +155,16 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
     },
   });
 
+  const updatePlaceImage = useMutation({
+    mutationFn: async ({ placeId, imageUrl }: { placeId: number; imageUrl: string }) => {
+      await apiRequest('PATCH', `/api/places/${placeId}`, { imageUrl });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/places'] });
+      setShowPhotoGallery(false);
+    },
+  });
+
   const toggleFavorite = () => {
     if (!place) return;
     if (isFavorite) {
@@ -144,6 +173,20 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
       addFavorite.mutate(place.id);
     }
   };
+
+  const handleFetchPhotos = () => {
+    setShowPhotoGallery(true);
+    setCurrentPhotoIndex(0);
+    fetchPhotos();
+  };
+
+  const handleSelectPhoto = (photoReference: string) => {
+    if (!place) return;
+    // Store the photo reference, not the proxied URL - the display will create the proxy URL
+    updatePlaceImage.mutate({ placeId: place.id, imageUrl: `googleref:${photoReference}` });
+  };
+
+  const photos = photosData?.photos || [];
 
   if (!place) return null;
 
@@ -157,37 +200,154 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
         <ScrollArea className="h-full">
           {/* Hero Image - scrolls with content */}
           <div className="relative h-48 sm:h-64 w-full">
-            <img 
-              src={place.imageUrl || "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&auto=format&fit=crop&q=60"} 
-              alt={place.name} 
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
-            
-            {/* Favorite Button */}
-            <Button
-              size="icon"
-              variant="ghost"
-              className={`absolute top-4 right-4 bg-black/40 backdrop-blur-sm border border-white/20 ${isFavorite ? 'text-red-500' : 'text-white'}`}
-              onClick={toggleFavorite}
-              data-testid="button-favorite"
-            >
-              <Heart className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
-            </Button>
-            
-            <div className="absolute bottom-4 left-4 right-4 sm:left-6 sm:right-6">
-              <div className="flex gap-2 mb-2 flex-wrap">
-                <Badge className="bg-primary/90 hover:bg-primary">{place.category}</Badge>
-                {place.subcategory && <Badge variant="outline" className="text-white border-white/20 bg-black/40 backdrop-blur-md">{place.subcategory}</Badge>}
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-display font-bold text-white shadow-sm">{place.name}</h2>
-              {place.address && (
-                <div className="flex items-center gap-2 text-white/80 mt-1 text-xs sm:text-sm">
-                  <MapPin className="w-4 h-4 shrink-0" />
-                  <span className="line-clamp-1">{place.address}</span>
+            {showPhotoGallery && photos.length > 0 ? (
+              <>
+                {/* Photo Gallery Mode */}
+                <img 
+                  src={photos[currentPhotoIndex].url} 
+                  alt={`${place.name} photo ${currentPhotoIndex + 1}`} 
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-black/30" />
+                
+                {/* Gallery Navigation */}
+                <div className="absolute top-4 left-4 right-4 flex items-center justify-between gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="bg-black/40 backdrop-blur-sm border border-white/20 text-white gap-1"
+                    onClick={() => setShowPhotoGallery(false)}
+                    data-testid="button-close-gallery"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Back
+                  </Button>
+                  <Badge className="bg-black/60 text-white border-none">
+                    {currentPhotoIndex + 1} / {photos.length}
+                  </Badge>
+                  <Button
+                    size="sm"
+                    className="bg-primary gap-1"
+                    onClick={() => handleSelectPhoto(photos[currentPhotoIndex].photoReference)}
+                    disabled={updatePlaceImage.isPending}
+                    data-testid="button-select-photo"
+                  >
+                    {updatePlaceImage.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                    Use This
+                  </Button>
                 </div>
-              )}
-            </div>
+
+                {/* Photo Navigation Arrows */}
+                {photos.length > 1 && (
+                  <>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 backdrop-blur-sm border border-white/20 text-white"
+                      onClick={() => setCurrentPhotoIndex(i => (i > 0 ? i - 1 : photos.length - 1))}
+                      data-testid="button-prev-photo"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 backdrop-blur-sm border border-white/20 text-white"
+                      onClick={() => setCurrentPhotoIndex(i => (i < photos.length - 1 ? i + 1 : 0))}
+                      data-testid="button-next-photo"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </Button>
+                  </>
+                )}
+
+                {/* Photo Thumbnails */}
+                <div className="absolute bottom-4 left-4 right-4 flex gap-2 justify-center overflow-x-auto">
+                  {photos.map((photo, idx) => (
+                    <button
+                      key={photo.photoReference}
+                      onClick={() => setCurrentPhotoIndex(idx)}
+                      className={`w-12 h-12 rounded-md overflow-hidden border-2 shrink-0 transition-all ${
+                        idx === currentPhotoIndex ? 'border-primary ring-2 ring-primary/50' : 'border-white/30 opacity-70'
+                      }`}
+                      data-testid={`button-thumbnail-${idx}`}
+                    >
+                      <img src={photo.url} alt="" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : showPhotoGallery && photosLoading ? (
+              <>
+                {/* Loading State */}
+                <div className="w-full h-full bg-muted flex items-center justify-center">
+                  <div className="text-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">Finding photos...</p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="absolute top-4 left-4 bg-black/40 backdrop-blur-sm border border-white/20 text-white gap-1"
+                  onClick={() => setShowPhotoGallery(false)}
+                  data-testid="button-cancel-loading"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                {/* Default Image View */}
+                <img 
+                  src={getDisplayImageUrl(place.imageUrl, DEFAULT_PLACE_IMAGE)} 
+                  alt={place.name} 
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
+                
+                {/* Action Buttons */}
+                <div className="absolute top-4 right-4 flex gap-2">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="bg-black/40 backdrop-blur-sm border border-white/20 text-white"
+                    onClick={handleFetchPhotos}
+                    data-testid="button-fetch-photos"
+                  >
+                    <Camera className="w-5 h-5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={`bg-black/40 backdrop-blur-sm border border-white/20 ${isFavorite ? 'text-red-500' : 'text-white'}`}
+                    onClick={toggleFavorite}
+                    data-testid="button-favorite"
+                  >
+                    <Heart className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
+                  </Button>
+                </div>
+                
+                <div className="absolute bottom-4 left-4 right-4 sm:left-6 sm:right-6">
+                  <div className="flex gap-2 mb-2 flex-wrap">
+                    <Badge className="bg-primary/90 hover:bg-primary">{place.category}</Badge>
+                    {place.subcategory && <Badge variant="outline" className="text-white border-white/20 bg-black/40 backdrop-blur-md">{place.subcategory}</Badge>}
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-display font-bold text-white shadow-sm">{place.name}</h2>
+                  {place.address && (
+                    <div className="flex items-center gap-2 text-white/80 mt-1 text-xs sm:text-sm">
+                      <MapPin className="w-4 h-4 shrink-0" />
+                      <span className="line-clamp-1">{place.address}</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
           <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
             {/* Quick Stats Grid */}

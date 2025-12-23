@@ -15,6 +15,20 @@ export interface PlaceLookupResult {
   error?: string;
 }
 
+export interface PlacePhoto {
+  photoReference: string;
+  url: string;
+  width: number;
+  height: number;
+  attributions: string[];
+}
+
+export interface PhotoFetchResult {
+  success: boolean;
+  photos?: PlacePhoto[];
+  error?: string;
+}
+
 export interface ReviewInsight {
   sentimentScore: number;
   sentimentLabel: "Very Positive" | "Positive" | "Mixed" | "Negative" | "Very Negative";
@@ -689,4 +703,125 @@ function formatParkingInfo(options: any): string {
   if (options.valetParking) parts.push("Valet parking available");
   if (options.wheelchairAccessibleParking) parts.push("Accessible parking available");
   return parts.join(". ") || "Parking information not available";
+}
+
+// Fetch high-quality photos for a place
+export async function fetchPlacePhotos(placeName: string, address?: string, maxPhotos: number = 5): Promise<PhotoFetchResult> {
+  if (!GOOGLE_PLACES_API_KEY) {
+    return { success: false, error: "Google Places API key not configured" };
+  }
+
+  // First, search for the place to get its ID
+  const { placeId } = await searchPlaceId(placeName, address);
+  
+  if (!placeId) {
+    return { success: false, error: `Could not find place: ${placeName}` };
+  }
+
+  // Get place details including photos
+  const url = `https://places.googleapis.com/v1/places/${placeId}`;
+  
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+        "X-Goog-FieldMask": "photos",
+      },
+    });
+    
+    const data = await response.json();
+    console.log("Place photos response:", JSON.stringify(data).substring(0, 500));
+    
+    if (!data.photos || data.photos.length === 0) {
+      return { success: false, error: "No photos available for this place" };
+    }
+
+    // Build photo references (up to maxPhotos) - URLs will be proxied through our server
+    const photos: PlacePhoto[] = [];
+    const photosToFetch = data.photos.slice(0, maxPhotos);
+    
+    for (const photo of photosToFetch) {
+      // photo.name is like "places/ChIJ.../photos/ABC123..."
+      const photoName = photo.name;
+      // URL will be proxied through our server endpoint - don't expose API key
+      const photoRef = encodeURIComponent(photoName);
+      const photoUrl = `/api/photos/proxy?ref=${photoRef}`;
+      
+      // Get attributions
+      const attributions = photo.authorAttributions?.map((a: any) => a.displayName || "Google Maps") || ["Google Maps"];
+      
+      photos.push({
+        photoReference: photoName,
+        url: photoUrl,
+        width: photo.widthPx || 1600,
+        height: photo.heightPx || 1200,
+        attributions,
+      });
+    }
+
+    return { success: true, photos };
+  } catch (error) {
+    console.error("Error fetching place photos:", error);
+    return { success: false, error: "Failed to fetch photos" };
+  }
+}
+
+// Fetch photos by Google Maps URL
+export async function fetchPhotosFromUrl(googleMapsUrl: string, maxPhotos: number = 5): Promise<PhotoFetchResult> {
+  if (!GOOGLE_PLACES_API_KEY) {
+    return { success: false, error: "Google Places API key not configured" };
+  }
+
+  // Extract place name from URL (reusing existing logic)
+  const lowerUrl = googleMapsUrl.toLowerCase();
+  const isValidGoogleMapsUrl = 
+    lowerUrl.includes("google.com/maps") || 
+    lowerUrl.includes("maps.google.com") || 
+    lowerUrl.includes("goo.gl/maps") ||
+    lowerUrl.includes("maps.app.goo.gl") ||
+    lowerUrl.includes("goo.gl/");
+    
+  if (!isValidGoogleMapsUrl) {
+    return { success: false, error: "Please provide a valid Google Maps URL" };
+  }
+
+  // For shortened URLs, follow redirect
+  let resolvedUrl = googleMapsUrl;
+  if (lowerUrl.includes("goo.gl") || lowerUrl.includes("maps.app.goo.gl")) {
+    try {
+      const response = await fetch(googleMapsUrl, { 
+        method: 'HEAD', 
+        redirect: 'follow',
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      });
+      resolvedUrl = response.url;
+    } catch (error) {
+      console.error("Failed to resolve shortened URL:", error);
+    }
+  }
+
+  // Extract place name
+  let searchQuery = "";
+  const placeMatch = resolvedUrl.match(/\/place\/([^/@?]+)/);
+  if (placeMatch) {
+    searchQuery = decodeURIComponent(placeMatch[1].replace(/\+/g, " "));
+  }
+
+  if (!searchQuery) {
+    try {
+      const url = new URL(resolvedUrl);
+      searchQuery = url.searchParams.get("q") || url.searchParams.get("query") || "";
+      if (searchQuery) {
+        searchQuery = decodeURIComponent(searchQuery.replace(/\+/g, " "));
+      }
+    } catch {}
+  }
+
+  if (!searchQuery) {
+    return { success: false, error: "Could not extract place name from URL" };
+  }
+
+  return await fetchPlacePhotos(searchQuery, undefined, maxPhotos);
 }

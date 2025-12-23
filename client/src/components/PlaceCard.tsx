@@ -2,6 +2,7 @@ import { Place } from "@shared/schema";
 import { Star, MapPin, Clock, Car } from "lucide-react";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
+import { getDisplayImageUrl, DEFAULT_PLACE_IMAGE } from "@/lib/image-utils";
 
 interface PlaceCardProps {
   place: Place;
@@ -10,7 +11,7 @@ interface PlaceCardProps {
 
 export function PlaceCard({ place, onClick }: PlaceCardProps) {
   // Use a fallback image if none provided
-  const image = place.imageUrl || "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&auto=format&fit=crop&q=60";
+  const image = getDisplayImageUrl(place.imageUrl, DEFAULT_PLACE_IMAGE);
 
   return (
     <motion.div

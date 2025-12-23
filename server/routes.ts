@@ -7,7 +7,7 @@ import OpenAI from "openai";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
-import { getReviewAnalysis, lookupPlaceFromUrl, lookupPlaceByName, processVoiceTranscript } from "./google-places";
+import { getReviewAnalysis, lookupPlaceFromUrl, lookupPlaceByName, processVoiceTranscript, fetchPlacePhotos, PlacePhoto } from "./google-places";
 import type { InsertPlace, Place, UpdatePlaceRequest } from "@shared/schema";
 
 // Fields to always preserve from existing (user-generated data)
@@ -845,6 +845,112 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching review analysis:", error);
       res.status(500).json({ message: "Failed to analyze reviews" });
+    }
+  });
+
+  // === Google Places Photos API ===
+  
+  // Proxy endpoint to serve Google Photos without exposing API key
+  app.get("/api/photos/proxy", async (req, res) => {
+    try {
+      const photoRef = req.query.ref as string;
+      if (!photoRef) {
+        return res.status(400).json({ message: "Photo reference required" });
+      }
+
+      const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ message: "Google Places API key not configured" });
+      }
+
+      const decodedRef = decodeURIComponent(photoRef);
+      const googlePhotoUrl = `https://places.googleapis.com/v1/${decodedRef}/media?maxWidthPx=1600&key=${apiKey}`;
+      
+      const response = await fetch(googlePhotoUrl);
+      
+      if (!response.ok) {
+        console.error("Google Photos API error:", response.status, response.statusText);
+        return res.status(response.status).json({ message: "Failed to fetch photo" });
+      }
+
+      // Forward the image with proper headers
+      const contentType = response.headers.get("content-type") || "image/jpeg";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 1 day
+      
+      const buffer = await response.arrayBuffer();
+      res.send(Buffer.from(buffer));
+    } catch (error) {
+      console.error("Error proxying photo:", error);
+      res.status(500).json({ message: "Failed to proxy photo" });
+    }
+  });
+
+  // Get photos for a specific place
+  app.get("/api/places/:id/photos", async (req, res) => {
+    try {
+      const place = await storage.getPlace(Number(req.params.id));
+      if (!place) {
+        return res.status(404).json({ message: "Place not found" });
+      }
+
+      const result = await fetchPlacePhotos(place.name, place.address || undefined, 5);
+      
+      if (!result.success) {
+        return res.status(404).json({ success: false, error: result.error });
+      }
+
+      res.json({ success: true, photos: result.photos });
+    } catch (error) {
+      console.error("Error fetching place photos:", error);
+      res.status(500).json({ success: false, error: "Failed to fetch photos" });
+    }
+  });
+
+  // Batch fetch photos for all places without images
+  app.post("/api/places/batch-photos", async (req, res) => {
+    try {
+      const allPlaces = await storage.getPlaces();
+      const results: { placeId: number; name: string; success: boolean; photoCount?: number; error?: string }[] = [];
+      
+      for (const place of allPlaces) {
+        try {
+          const result = await fetchPlacePhotos(place.name, place.address || undefined, 5);
+          
+          if (result.success && result.photos && result.photos.length > 0) {
+            results.push({
+              placeId: place.id,
+              name: place.name,
+              success: true,
+              photoCount: result.photos.length,
+            });
+          } else {
+            results.push({
+              placeId: place.id,
+              name: place.name,
+              success: false,
+              error: result.error || "No photos found",
+            });
+          }
+        } catch (error) {
+          results.push({
+            placeId: place.id,
+            name: place.name,
+            success: false,
+            error: "Error fetching photos",
+          });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      res.json({ 
+        success: true, 
+        message: `Found photos for ${successCount}/${allPlaces.length} places`,
+        results,
+      });
+    } catch (error) {
+      console.error("Error in batch photo fetch:", error);
+      res.status(500).json({ success: false, error: "Batch photo fetch failed" });
     }
   });
 
