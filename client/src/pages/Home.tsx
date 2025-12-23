@@ -7,6 +7,7 @@ import { PlaceDetail } from "@/components/PlaceDetail";
 import { AddPlaceModal } from "@/components/AddPlaceModal";
 import { FilterPanel } from "@/components/FilterPanel";
 import { SeasonalHighlights } from "@/components/SeasonalHighlights";
+import { WeatherSuggestions } from "@/components/WeatherSuggestions";
 import { usePlaces, useImportSampleData, PlaceFilters } from "@/hooks/use-places";
 import { Place } from "@shared/schema";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,14 @@ export default function Home() {
           onSearch={handleSearch} 
           onUploadClick={() => setIsUploadOpen(true)} 
         />
+
+        {/* Weather-Smart Suggestions - show when not filtering */}
+        {!filters.search && filters.category === 'all' && places && places.length > 0 && (
+          <WeatherSuggestions 
+            places={places} 
+            onPlaceClick={setSelectedPlace} 
+          />
+        )}
 
         {/* Seasonal Highlights - show when not filtering */}
         {!filters.search && filters.category === 'all' && places && places.length > 0 && (
