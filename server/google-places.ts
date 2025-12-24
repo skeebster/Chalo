@@ -851,7 +851,7 @@ export function calculateDriveTimeFromDistance(distanceMiles: number): number {
 const HOME_COORDS = { lat: 40.4976, lng: -74.4885 };
 
 // Get coordinates for an address using Google Places Text Search
-async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+export async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
   if (!GOOGLE_PLACES_API_KEY) return null;
   
   try {

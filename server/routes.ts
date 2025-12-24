@@ -947,6 +947,70 @@ export async function registerRoutes(
     }
   });
 
+  // === Backfill Coordinates for Existing Places ===
+  app.post("/api/places/backfill-coordinates", async (req, res) => {
+    const { geocodeAddress } = await import("./google-places");
+    
+    try {
+      const allPlaces = await storage.getPlaces();
+      const results: { id: number; name: string; lat: string; lng: string }[] = [];
+      let updatedCount = 0;
+      let skippedCount = 0;
+      
+      for (const place of allPlaces) {
+        // Skip places that already have coordinates
+        if (place.latitude && place.longitude) {
+          skippedCount++;
+          continue;
+        }
+        
+        // Need an address to geocode
+        const searchQuery = place.address || place.name;
+        if (!searchQuery) {
+          console.log(`Skipping ${place.name}: no address or name`);
+          continue;
+        }
+        
+        try {
+          const coords = await geocodeAddress(searchQuery);
+          
+          if (coords) {
+            await storage.updatePlace(place.id, {
+              latitude: coords.lat.toString(),
+              longitude: coords.lng.toString(),
+            });
+            results.push({ 
+              id: place.id, 
+              name: place.name, 
+              lat: coords.lat.toString(),
+              lng: coords.lng.toString()
+            });
+            updatedCount++;
+            console.log(`Added coordinates for ${place.name}: ${coords.lat}, ${coords.lng}`);
+          } else {
+            console.log(`Could not geocode ${place.name}`);
+          }
+          
+          // Small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } catch (error) {
+          console.error(`Error geocoding ${place.name}:`, error);
+        }
+      }
+      
+      res.json({ 
+        success: true, 
+        totalPlaces: allPlaces.length,
+        updatedCount,
+        skippedCount,
+        results
+      });
+    } catch (error) {
+      console.error("Error backfilling coordinates:", error);
+      res.status(500).json({ success: false, message: "Failed to backfill coordinates" });
+    }
+  });
+
   // === Google Places Review Analysis API ===
   app.get("/api/places/:id/reviews", async (req, res) => {
     try {
