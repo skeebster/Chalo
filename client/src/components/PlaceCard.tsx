@@ -1,10 +1,9 @@
 import { Place } from "@shared/schema";
-import { Star, MapPin, Clock, Car, Sun, Cloud, CloudRain, Snowflake, CloudLightning, CloudSun, Droplets, Shirt, ChevronDown, ChevronUp } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Star, MapPin, Clock, Car, Sun, Cloud, CloudRain, Snowflake, CloudLightning, CloudSun, Droplets, Shirt } from "lucide-react";
+import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { getDisplayImageUrl, DEFAULT_PLACE_IMAGE } from "@/lib/image-utils";
 import { useWeather, DayForecast } from "@/hooks/use-weather";
-import { useState } from "react";
 
 function WeatherIcon({ code, className }: { code: number; className?: string }) {
   if (code === 0 || code === 1) return <Sun className={className} />;
@@ -22,15 +21,9 @@ interface PlaceCardProps {
 }
 
 export function PlaceCard({ place, onClick }: PlaceCardProps) {
-  const [showForecast, setShowForecast] = useState(false);
-  
-  // Use a fallback image if none provided
   const image = getDisplayImageUrl(place.imageUrl, DEFAULT_PLACE_IMAGE);
-  
-  // Check if this is a highly-rated place (4.8+)
   const isHighlyRated = place.googleRating ? parseFloat(place.googleRating) >= 4.8 : false;
   
-  // Fetch weather for the destination's actual location
   const lat = place.latitude ? parseFloat(place.latitude) : null;
   const lng = place.longitude ? parseFloat(place.longitude) : null;
   const { data: weather } = useWeather(lat, lng);
@@ -39,6 +32,7 @@ export function PlaceCard({ place, onClick }: PlaceCardProps) {
     <motion.div
       whileHover={{ y: -5 }}
       transition={{ type: "spring", stiffness: 300 }}
+      onClick={onClick}
       className={`group cursor-pointer bg-card rounded-2xl overflow-hidden border shadow-lg transition-all h-full flex flex-col ${
         isHighlyRated 
           ? "border-amber-500/30 hover:border-amber-400/60 hover:shadow-xl hover:shadow-amber-500/20 ring-1 ring-amber-500/10 hover:ring-amber-400/30" 
@@ -46,7 +40,69 @@ export function PlaceCard({ place, onClick }: PlaceCardProps) {
       }`}
       data-testid={`card-place-${place.id}`}
     >
-      <div className="relative h-32 sm:h-48 overflow-hidden" onClick={onClick}>
+      {/* Weather Section - Prominent at top */}
+      {weather && (
+        <div className="bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary/20">
+                <WeatherIcon code={weather.code} className="w-7 h-7 sm:w-8 sm:h-8 text-primary" />
+              </div>
+              <div>
+                <div className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
+                  {weather.temp}°
+                </div>
+                <div className="text-xs sm:text-sm text-muted-foreground">{weather.description}</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-muted-foreground">H: {weather.high}° L: {weather.low}°</div>
+              {weather.precipProb > 0 && (
+                <div className="flex items-center justify-end gap-1 text-xs text-blue-400 mt-0.5">
+                  <Droplets className="w-3 h-3" />
+                  {weather.precipProb}% rain
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* 7-day forecast row */}
+          <div className="flex justify-between gap-0.5 sm:gap-1 mt-2 pt-2 border-t border-border/30">
+            {weather.weekForecast.map((day, i) => (
+              <div 
+                key={i} 
+                className={`flex flex-col items-center flex-1 py-1 rounded ${
+                  i === 0 ? 'bg-primary/10' : ''
+                }`}
+              >
+                <span className="text-[9px] sm:text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                  {day.dayName}
+                </span>
+                <WeatherIcon code={day.code} className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-foreground my-0.5" />
+                <span className="text-[10px] sm:text-xs font-bold">{day.high}°</span>
+                <span className="text-[9px] sm:text-[10px] text-muted-foreground">{day.low}°</span>
+              </div>
+            ))}
+          </div>
+          
+          {/* Attire recommendations */}
+          {weather.attire.length > 0 && (
+            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/30">
+              <Shirt className="w-3.5 h-3.5 text-primary shrink-0" />
+              <div className="flex flex-wrap gap-1">
+                {weather.attire.slice(0, 3).map((item, i) => (
+                  <span key={i} className="text-[10px] sm:text-xs text-muted-foreground">
+                    {item}{i < Math.min(weather.attire.length, 3) - 1 ? ' · ' : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Image section */}
+      <div className="relative h-28 sm:h-40 overflow-hidden">
         <img
           src={image}
           alt={place.name}
@@ -75,7 +131,8 @@ export function PlaceCard({ place, onClick }: PlaceCardProps) {
         </div>
       </div>
 
-      <div className="p-3 sm:p-5 flex-1 flex flex-col" onClick={onClick}>
+      {/* Content section */}
+      <div className="p-3 sm:p-5 flex-1 flex flex-col">
         <div className="flex justify-between items-start gap-2 mb-1.5 sm:mb-2">
           <h3 className="font-display font-bold text-sm sm:text-lg leading-tight text-white group-hover:text-primary transition-colors line-clamp-2">
             {place.name}
@@ -117,99 +174,6 @@ export function PlaceCard({ place, onClick }: PlaceCardProps) {
           )}
         </div>
       </div>
-      
-      {weather && (
-        <div className="border-t border-border/50">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowForecast(!showForecast);
-            }}
-            className="w-full p-3 sm:p-4 flex items-center justify-between hover-elevate transition-all"
-            data-testid={`button-weather-toggle-${place.id}`}
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10">
-                <WeatherIcon code={weather.code} className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-              </div>
-              <div className="text-left">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg sm:text-xl font-bold text-foreground">{weather.temp}°F</span>
-                  <span className="text-xs sm:text-sm text-muted-foreground">{weather.description}</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>H: {weather.high}° L: {weather.low}°</span>
-                  {weather.precipProb > 0 && (
-                    <span className="flex items-center gap-0.5 text-blue-400">
-                      <Droplets className="w-3 h-3" />
-                      {weather.precipProb}%
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <span className="text-xs hidden sm:inline">7-day forecast</span>
-              {showForecast ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </div>
-          </button>
-          
-          <AnimatePresence>
-            {showForecast && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-3">
-                  <div className="grid grid-cols-7 gap-1 sm:gap-2">
-                    {weather.weekForecast.map((day, i) => (
-                      <div 
-                        key={i} 
-                        className={`flex flex-col items-center p-1.5 sm:p-2 rounded-lg text-center ${
-                          i === 0 ? 'bg-primary/10' : 'bg-muted/30'
-                        }`}
-                      >
-                        <span className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1">
-                          {day.dayName}
-                        </span>
-                        <WeatherIcon code={day.code} className="w-4 h-4 sm:w-5 sm:h-5 text-foreground mb-1" />
-                        <span className="text-xs sm:text-sm font-bold">{day.high}°</span>
-                        <span className="text-[10px] sm:text-xs text-muted-foreground">{day.low}°</span>
-                        {day.precipProb > 0 && (
-                          <div className="flex items-center gap-0.5 text-[9px] sm:text-[10px] text-blue-400 mt-0.5">
-                            <Droplets className="w-2 h-2 sm:w-2.5 sm:h-2.5" />
-                            {day.precipProb}%
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {weather.attire.length > 0 && (
-                    <div className="flex items-start gap-2 pt-2 border-t border-border/30">
-                      <Shirt className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                      <div className="flex flex-wrap gap-1.5">
-                        {weather.attire.map((item, i) => (
-                          <Badge 
-                            key={i} 
-                            variant="outline" 
-                            className="text-[10px] sm:text-xs bg-muted/30 border-border/50"
-                          >
-                            {item}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
     </motion.div>
   );
 }
