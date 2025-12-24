@@ -11,12 +11,14 @@ import { WeatherSuggestions } from "@/components/WeatherSuggestions";
 import { usePlaces, useImportSampleData, PlaceFilters } from "@/hooks/use-places";
 import { Place } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import { Loader2, Database } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Database, ArrowUpDown } from "lucide-react";
 
 export default function Home() {
   const [filters, setFilters] = useState<PlaceFilters>({
     category: "all",
     search: "",
+    sort: "newest",
   });
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -65,9 +67,27 @@ export default function Home() {
 
         <div className="space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <h2 className="text-2xl font-display font-bold text-white">
-              Explore Destinations
-            </h2>
+            <div className="flex items-center gap-4 flex-wrap">
+              <h2 className="text-2xl font-display font-bold text-white">
+                Explore Destinations
+              </h2>
+              <Select 
+                value={filters.sort || "newest"} 
+                onValueChange={(value) => setFilters(prev => ({ ...prev, sort: value }))}
+              >
+                <SelectTrigger className="w-[180px]" data-testid="select-sort">
+                  <ArrowUpDown className="w-4 h-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="Sort by..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest" data-testid="sort-newest">Most Recent</SelectItem>
+                  <SelectItem value="oldest" data-testid="sort-oldest">Oldest First</SelectItem>
+                  <SelectItem value="rating" data-testid="sort-rating">Highest Rated</SelectItem>
+                  <SelectItem value="distance" data-testid="sort-distance">Closest First</SelectItem>
+                  <SelectItem value="name" data-testid="sort-name">A-Z</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Categories 
               selectedCategory={filters.category || "all"} 
               onSelect={handleCategorySelect} 

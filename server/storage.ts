@@ -113,7 +113,12 @@ export class DatabaseStorage implements IStorage {
       query = query.orderBy(places.distanceMiles);
     } else if (filters?.sort === 'rating') {
       query = query.orderBy(desc(places.googleRating));
+    } else if (filters?.sort === 'oldest') {
+      query = query.orderBy(places.createdAt);
+    } else if (filters?.sort === 'name') {
+      query = query.orderBy(places.name);
     } else {
+      // Default: newest first (most recently added)
       query = query.orderBy(desc(places.createdAt));
     }
 
