@@ -22,6 +22,8 @@ import { getDisplayImageUrl, DEFAULT_PLACE_IMAGE } from "@/lib/image-utils";
 import { AddToPlanDialog } from "./AddToPlanDialog";
 import { NearbyPlaces } from "./NearbyPlaces";
 import { usePlaces } from "@/hooks/use-places";
+import { useWeather } from "@/hooks/use-weather";
+import { Cloud, CloudRain, Snowflake as SnowflakeIcon, CloudLightning, CloudSun, Droplets, Shirt } from "lucide-react";
 
 interface PlacePhoto {
   photoReference: string;
@@ -125,6 +127,113 @@ function getSentimentBgColor(score: number): string {
   if (score >= 40) return "bg-yellow-500/20 border-yellow-500/30";
   if (score >= 20) return "bg-orange-500/20 border-orange-500/30";
   return "bg-red-500/20 border-red-500/30";
+}
+
+function WeatherIcon({ code, className }: { code: number; className?: string }) {
+  if (code === 0 || code === 1) return <Sun className={className} />;
+  if (code === 2) return <CloudSun className={className} />;
+  if (code >= 3 && code <= 48) return <Cloud className={className} />;
+  if (code >= 51 && code <= 67) return <CloudRain className={className} />;
+  if (code >= 71 && code <= 86) return <SnowflakeIcon className={className} />;
+  if (code >= 95 && code <= 99) return <CloudLightning className={className} />;
+  return <Cloud className={className} />;
+}
+
+function WeatherSection({ place }: { place: Place }) {
+  const lat = place.latitude ? parseFloat(place.latitude) : null;
+  const lng = place.longitude ? parseFloat(place.longitude) : null;
+  const { data: weather, isLoading } = useWeather(lat, lng);
+  
+  if (!lat || !lng) return null;
+  if (isLoading) {
+    return (
+      <section>
+        <h3 className="text-sm sm:text-lg font-bold text-white mb-2 sm:mb-3 flex items-center gap-2">
+          <Cloud className="w-4 sm:w-5 h-4 sm:h-5 text-primary" /> Weather Forecast
+        </h3>
+        <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-4 rounded-xl border border-primary/20">
+          <Skeleton className="h-20 w-full" />
+        </div>
+      </section>
+    );
+  }
+  if (!weather) return null;
+
+  return (
+    <section>
+      <h3 className="text-sm sm:text-lg font-bold text-white mb-2 sm:mb-3 flex items-center gap-2">
+        <Cloud className="w-4 sm:w-5 h-4 sm:h-5 text-primary" /> Weather Forecast
+      </h3>
+      <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-3 sm:p-4 rounded-xl border border-primary/20">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-primary/20">
+              <WeatherIcon code={weather.code} className="w-8 h-8 sm:w-10 sm:h-10 text-primary" />
+            </div>
+            <div>
+              <div className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
+                {weather.temp}°F
+              </div>
+              <div className="text-sm text-muted-foreground">{weather.description}</div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-sm text-muted-foreground">H: {weather.high}° L: {weather.low}°</div>
+            {weather.precipProb > 0 && (
+              <div className="flex items-center justify-end gap-1 text-sm text-blue-400 mt-1">
+                <Droplets className="w-4 h-4" />
+                {weather.precipProb}% chance of precipitation
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex justify-between gap-1 pt-3 border-t border-border/30">
+          {weather.weekForecast.map((day, i) => (
+            <div 
+              key={i} 
+              className={`flex flex-col items-center flex-1 py-2 rounded-lg ${
+                i === 0 ? 'bg-primary/15' : ''
+              }`}
+            >
+              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                {day.dayName}
+              </span>
+              <WeatherIcon code={day.code} className="w-4 h-4 sm:w-5 sm:h-5 text-foreground my-1" />
+              <span className="text-xs sm:text-sm font-bold">{day.high}°</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground">{day.low}°</span>
+              {day.precipProb > 0 && (
+                <div className="flex items-center gap-0.5 text-[9px] sm:text-[10px] text-blue-400 mt-0.5">
+                  <Droplets className="w-2.5 h-2.5" />
+                  {day.precipProb}%
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        
+        {weather.attire.length > 0 && (
+          <div className="flex items-start gap-2 mt-3 pt-3 border-t border-border/30">
+            <Shirt className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+            <div>
+              <span className="text-xs text-muted-foreground font-medium">What to wear:</span>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {weather.attire.map((item, i) => (
+                  <Badge 
+                    key={i} 
+                    variant="outline" 
+                    className="text-[10px] sm:text-xs bg-muted/30 border-border/50"
+                  >
+                    {item}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
 }
 
 export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
@@ -418,6 +527,9 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
                 <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed break-words">{place.overview}</p>
               </section>
             )}
+
+            {/* Weather Section */}
+            <WeatherSection place={place} />
 
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
