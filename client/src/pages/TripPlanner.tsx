@@ -83,9 +83,10 @@ function VerticalTimeline({
     return parseTimeToMinutes(a.time) + 60;
   }));
   
-  // Start 1 hour before, end 1 hour after
-  const minTime = Math.max(0, minActivityTime - 60);
-  const maxTime = maxActivityTime + 60;
+  // Start at the hour before the earliest activity, end 1 hour after the latest
+  const startHour = Math.floor(minActivityTime / 60);
+  const minTime = Math.max(0, startHour * 60 - 60); // Start 1 hour before
+  const maxTime = Math.ceil(maxActivityTime / 60) * 60 + 60; // End 1 hour after
   const totalMinutes = maxTime - minTime;
   
   const timelineHeight = totalMinutes * zoomLevel;
@@ -133,39 +134,28 @@ function VerticalTimeline({
             Time
           </div>
           <div style={{ height: `${timelineHeight}px`, position: 'relative' }}>
-            {/* Hour markers */}
-            {Array.from({ length: Math.ceil(totalMinutes / 60) + 1 }).map((_, i) => {
-              const currentMinutes = minTime + i * 60;
+            {/* All 15-minute markers */}
+            {Array.from({ length: Math.ceil(totalMinutes / 15) + 1 }).map((_, i) => {
+              const currentMinutes = minTime + i * 15;
+              const isHourMarker = currentMinutes % 60 === 0;
+              
               return (
                 <div
-                  key={`hour-${i}`}
+                  key={`time-marker-${i}`}
                   style={{
                     position: 'absolute',
                     top: `${currentMinutes * zoomLevel}px`,
-                    height: '60px',
                   }}
-                  className="relative"
                 >
-                  <span className="text-[10px] text-muted-foreground/80 font-semibold px-1 py-0.5 block">
-                    {formatTimeLabel(currentMinutes)}
-                  </span>
-                  
-                  {/* 15-minute sub-markers */}
-                  {[15, 30, 45].map(offset => (
-                    <div
-                      key={`marker-${i}-${offset}`}
-                      style={{
-                        position: 'absolute',
-                        top: `${offset * zoomLevel}px`,
-                        left: 0,
-                        right: 0,
-                      }}
-                    >
-                      <span className="text-[8px] text-muted-foreground/40 px-1">
-                        :{offset.toString().padStart(2, '0')}
-                      </span>
-                    </div>
-                  ))}
+                  {isHourMarker ? (
+                    <span className="text-[10px] text-muted-foreground/80 font-semibold px-1 py-0.5 block">
+                      {formatTimeLabel(currentMinutes)}
+                    </span>
+                  ) : (
+                    <span className="text-[8px] text-muted-foreground/40 px-1">
+                      :{(currentMinutes % 60).toString().padStart(2, '0')}
+                    </span>
+                  )}
                 </div>
               );
             })}
