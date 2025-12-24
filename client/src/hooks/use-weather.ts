@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { isSaturday, isSunday, nextSaturday, format } from "date-fns";
+import { isSaturday, isSunday, nextSaturday, format, addDays } from "date-fns";
 
 interface WeatherData {
   current_weather: {
@@ -16,6 +16,16 @@ interface WeatherData {
   };
 }
 
+export interface DayForecast {
+  date: Date;
+  dayName: string;
+  high: number;
+  low: number;
+  code: number;
+  precipProb: number;
+  description: string;
+}
+
 export interface WeekendWeather {
   temp: number;
   high: number;
@@ -24,6 +34,8 @@ export interface WeekendWeather {
   precipProb: number;
   description: string;
   isWeekend: boolean;
+  weekForecast: DayForecast[];
+  attire: string[];
 }
 
 function getWeatherDescription(code: number): string {
@@ -43,6 +55,53 @@ function getWeatherDescription(code: number): string {
   if (code === 95) return "Storm";
   if (code >= 96 && code <= 99) return "Storm";
   return "";
+}
+
+function getAttireRecommendations(high: number, low: number, code: number, precipProb: number): string[] {
+  const attire: string[] = [];
+  
+  // Temperature-based recommendations
+  if (low < 32) {
+    attire.push("Heavy winter coat");
+    attire.push("Warm layers");
+    attire.push("Gloves & hat");
+  } else if (low < 45) {
+    attire.push("Warm jacket");
+    attire.push("Layered clothing");
+  } else if (low < 55) {
+    attire.push("Light jacket");
+    attire.push("Long sleeves");
+  } else if (high > 85) {
+    attire.push("Light, breathable clothing");
+    attire.push("Hat for sun protection");
+  } else if (high > 70) {
+    attire.push("Comfortable casual wear");
+  }
+  
+  // Weather condition-based recommendations
+  if (precipProb > 40 || (code >= 51 && code <= 82)) {
+    attire.push("Rain jacket or umbrella");
+    attire.push("Waterproof shoes");
+  }
+  
+  if (code >= 71 && code <= 86) {
+    attire.push("Snow boots");
+    attire.push("Warm waterproof gear");
+  }
+  
+  if (code === 0 || code === 1) {
+    attire.push("Sunglasses");
+    if (high > 75) {
+      attire.push("Sunscreen");
+    }
+  }
+  
+  // Hiking/outdoor gear for moderate weather
+  if (attire.length === 0 || (high >= 55 && high <= 75 && precipProb < 30)) {
+    attire.push("Comfortable walking shoes");
+  }
+  
+  return attire.slice(0, 4); // Limit to 4 recommendations
 }
 
 export function useWeather(latitude?: number | null, longitude?: number | null) {
@@ -76,6 +135,29 @@ export function useWeather(latitude?: number | null, longitude?: number | null) 
       const temp = isWeekend 
         ? Math.round(data.current_weather.temperature)
         : Math.round(data.daily.temperature_2m_max[dayIndex]);
+      
+      // Build 7-day forecast
+      const weekForecast: DayForecast[] = data.daily.time.map((dateStr, i) => {
+        const date = new Date(dateStr + 'T00:00:00');
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        return {
+          date,
+          dayName: i === 0 ? 'Today' : dayNames[date.getDay()],
+          high: Math.round(data.daily.temperature_2m_max[i]),
+          low: Math.round(data.daily.temperature_2m_min[i]),
+          code: data.daily.weathercode[i],
+          precipProb: data.daily.precipitation_probability_max[i],
+          description: getWeatherDescription(data.daily.weathercode[i]),
+        };
+      });
+      
+      // Get attire recommendations for the target day
+      const attire = getAttireRecommendations(
+        data.daily.temperature_2m_max[dayIndex],
+        data.daily.temperature_2m_min[dayIndex],
+        code,
+        data.daily.precipitation_probability_max[dayIndex]
+      );
 
       return {
         temp,
@@ -85,6 +167,8 @@ export function useWeather(latitude?: number | null, longitude?: number | null) 
         precipProb: data.daily.precipitation_probability_max[dayIndex],
         description: getWeatherDescription(code),
         isWeekend,
+        weekForecast,
+        attire,
       };
     },
     enabled: !!lat && !!lon,
@@ -94,14 +178,14 @@ export function useWeather(latitude?: number | null, longitude?: number | null) 
 }
 
 export function getWeatherIcon(code: number): string {
-  if (code === 0 || code === 1) return "☀️";
-  if (code === 2) return "⛅";
-  if (code === 3) return "☁️";
-  if (code >= 45 && code <= 48) return "🌫️";
-  if (code >= 51 && code <= 67) return "🌧️";
-  if (code >= 71 && code <= 77) return "❄️";
-  if (code >= 80 && code <= 82) return "🌧️";
-  if (code >= 85 && code <= 86) return "❄️";
-  if (code >= 95 && code <= 99) return "⛈️";
-  return "☁️";
+  if (code === 0 || code === 1) return "sun";
+  if (code === 2) return "cloud-sun";
+  if (code === 3) return "cloud";
+  if (code >= 45 && code <= 48) return "cloud";
+  if (code >= 51 && code <= 67) return "cloud-rain";
+  if (code >= 71 && code <= 77) return "snowflake";
+  if (code >= 80 && code <= 82) return "cloud-rain";
+  if (code >= 85 && code <= 86) return "snowflake";
+  if (code >= 95 && code <= 99) return "cloud-lightning";
+  return "cloud";
 }
