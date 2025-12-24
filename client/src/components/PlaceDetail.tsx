@@ -9,7 +9,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MapPin, Calendar, CalendarPlus, Clock, DollarSign, ExternalLink, ThumbsUp, ThumbsDown, Car, Info, Lightbulb, Star, Utensils, Zap, ParkingCircle, Sun, CheckCircle2, MessageCircle, TrendingUp, Sparkles, AlertCircle, Train, Heart, Camera, ChevronLeft, ChevronRight, Check, Loader2, Mountain } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { format, addDays, nextSaturday, isSaturday, isSunday } from "date-fns";
+import { format, addDays, nextSaturday, isSaturday, isSunday, addHours, setHours, setMinutes } from "date-fns";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
@@ -131,10 +134,26 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
   const [showAddToPlan, setShowAddToPlan] = useState(false);
   const [showCalendarPicker, setShowCalendarPicker] = useState(false);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(undefined);
+  const [calendarStartTime, setCalendarStartTime] = useState("10:00");
+  const [calendarEndTime, setCalendarEndTime] = useState("14:00");
+  const [calendarNotes, setCalendarNotes] = useState("");
+  const [calendarStep, setCalendarStep] = useState<'date' | 'details'>('date');
   
   const addToCalendar = useMutation({
-    mutationFn: async ({ placeId, date }: { placeId: number; date: string }) => {
-      const response = await apiRequest('POST', '/api/calendar/add-event', { placeId, date });
+    mutationFn: async ({ placeId, date, startTime, endTime, notes }: { 
+      placeId: number; 
+      date: string; 
+      startTime: string;
+      endTime: string;
+      notes: string;
+    }) => {
+      const response = await apiRequest('POST', '/api/calendar/add-event', { 
+        placeId, 
+        date,
+        startTime,
+        endTime,
+        notes 
+      });
       return response.json();
     },
     onSuccess: (data) => {
@@ -144,6 +163,10 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
       });
       setShowCalendarPicker(false);
       setSelectedCalendarDate(undefined);
+      setCalendarStep('date');
+      setCalendarNotes("");
+      setCalendarStartTime("10:00");
+      setCalendarEndTime("14:00");
     },
     onError: (error: any) => {
       toast({
@@ -910,38 +933,151 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
                 Add to Plan
               </Button>
               
-              <Popover open={showCalendarPicker} onOpenChange={setShowCalendarPicker}>
+              <Popover open={showCalendarPicker} onOpenChange={(open) => {
+                  setShowCalendarPicker(open);
+                  if (!open) {
+                    setCalendarStep('date');
+                    setCalendarNotes("");
+                  }
+                }}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="gap-2" data-testid="button-add-to-calendar">
                     <CalendarPlus className="w-4 h-4" />
                     Add to Calendar
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <div className="p-3 border-b">
-                    <p className="text-sm font-medium">Select a date for your visit</p>
-                    <p className="text-xs text-muted-foreground">This will add "{place.name}" to your Google Calendar</p>
-                  </div>
-                  <CalendarComponent
-                    mode="single"
-                    selected={selectedCalendarDate}
-                    onSelect={(date) => {
-                      setSelectedCalendarDate(date);
-                      if (date && place) {
-                        addToCalendar.mutate({
-                          placeId: place.id,
-                          date: format(date, 'yyyy-MM-dd'),
-                        });
-                      }
-                    }}
-                    disabled={(date) => date < new Date()}
-                    initialFocus
-                  />
-                  {addToCalendar.isPending && (
-                    <div className="p-3 border-t flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Adding to calendar...
-                    </div>
+                <PopoverContent className="w-80 p-0" align="end">
+                  {calendarStep === 'date' ? (
+                    <>
+                      <div className="p-3 border-b">
+                        <p className="text-sm font-medium">Select a date for your visit</p>
+                        <p className="text-xs text-muted-foreground">Add "{place.name}" to Google Calendar</p>
+                      </div>
+                      <CalendarComponent
+                        mode="single"
+                        selected={selectedCalendarDate}
+                        onSelect={(date) => {
+                          if (date) {
+                            setSelectedCalendarDate(date);
+                            // Set smart defaults based on place data
+                            const visitDuration = place.averageVisitDuration;
+                            const hours = visitDuration ? parseInt(visitDuration.match(/(\d+)/)?.[1] || "3") : 3;
+                            setCalendarStartTime("10:00");
+                            const endHour = Math.min(10 + hours, 20);
+                            setCalendarEndTime(`${endHour.toString().padStart(2, '0')}:00`);
+                            setCalendarStep('details');
+                          }
+                        }}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <div className="p-3 border-b">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium">{place.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {selectedCalendarDate && format(selectedCalendarDate, 'EEEE, MMMM d, yyyy')}
+                            </p>
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => setCalendarStep('date')}>
+                            Change
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="p-4 space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Start Time</Label>
+                            <Select 
+                              value={calendarStartTime} 
+                              onValueChange={(value) => {
+                                setCalendarStartTime(value);
+                                // Auto-adjust end time if it's now before or equal to start
+                                const startHour = parseInt(value.split(':')[0]);
+                                const endHour = parseInt(calendarEndTime.split(':')[0]);
+                                if (endHour <= startHour) {
+                                  const newEndHour = Math.min(startHour + 3, 21);
+                                  setCalendarEndTime(`${newEndHour.toString().padStart(2, '0')}:00`);
+                                }
+                              }}
+                            >
+                              <SelectTrigger data-testid="select-start-time">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: 14 }, (_, i) => i + 6).map(hour => (
+                                  <SelectItem key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
+                                    {hour > 12 ? `${hour - 12}:00 PM` : hour === 12 ? '12:00 PM' : `${hour}:00 AM`}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">End Time</Label>
+                            <Select value={calendarEndTime} onValueChange={setCalendarEndTime}>
+                              <SelectTrigger data-testid="select-end-time">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {/* Only show end times after the selected start time */}
+                                {Array.from({ length: 21 - parseInt(calendarStartTime.split(':')[0]) }, (_, i) => 
+                                  parseInt(calendarStartTime.split(':')[0]) + 1 + i
+                                ).filter(hour => hour <= 21).map(hour => (
+                                  <SelectItem key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
+                                    {hour > 12 ? `${hour - 12}:00 PM` : hour === 12 ? '12:00 PM' : `${hour}:00 AM`}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <Label className="text-xs text-muted-foreground mb-1 block">Notes (optional)</Label>
+                          <Textarea 
+                            placeholder="Add any notes for this visit..."
+                            value={calendarNotes}
+                            onChange={(e) => setCalendarNotes(e.target.value)}
+                            className="resize-none text-sm"
+                            rows={3}
+                            data-testid="input-calendar-notes"
+                          />
+                        </div>
+                        
+                        <Button 
+                          className="w-full gap-2" 
+                          onClick={() => {
+                            if (selectedCalendarDate && place) {
+                              addToCalendar.mutate({
+                                placeId: place.id,
+                                date: format(selectedCalendarDate, 'yyyy-MM-dd'),
+                                startTime: calendarStartTime,
+                                endTime: calendarEndTime,
+                                notes: calendarNotes,
+                              });
+                            }
+                          }}
+                          disabled={addToCalendar.isPending}
+                          data-testid="button-confirm-calendar"
+                        >
+                          {addToCalendar.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Adding...
+                            </>
+                          ) : (
+                            <>
+                              <CalendarPlus className="w-4 h-4" />
+                              Add to Calendar
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </>
                   )}
                 </PopoverContent>
               </Popover>
