@@ -1,0 +1,61 @@
+Create an iOS-style weather widget with dark mode aesthetic:
+
+CRITICAL BACKGROUND EFFECT:
+- Base color: #2C2C2E (dark charcoal)
+- Add subtle noise/grain texture at 3-4% opacity
+- Use SVG feTurbulence filter for noise: fractalNoise, baseFrequency 0.8
+- This texture is KEY to the premium iOS feel
+
+COLORS:
+- Background: #2C2C2E
+- Surface panels: rgba(255,255,255,0.08)
+- Text primary: #FFFFFF
+- Text secondary: #8E8E93 (gray, for low temps)
+- Text muted: #636366 (timeline labels)
+- Accent red: #FF453A (wind warning pill)
+- Accent blue: #32ADE6 (rain/snow drops)
+- Accent yellow: #FFD60A (sun, alert icons)
+
+TYPOGRAPHY:
+- Font: -apple-system, "SF Pro Display", system-ui
+- Large temperature: 96px, font-weight 200 (ultralight), letter-spacing -0.05em
+- Location: 13px uppercase, font-weight 600, tracking wide
+- Condition: 20px font-weight 600
+- Day labels: 11px font-weight 600
+- Forecast temps: 20-24px font-weight 400
+
+LAYOUT:
+- Widget: rounded-3xl (24px radius), padding 24px
+- Shadow: 0 25px 50px -12px rgba(0,0,0,0.5)
+- Header: Large temp left, location/condition, moon icon right
+- Middle: Temperature range bar in translucent panel
+- Bottom: 7-day forecast grid (8 columns including today)
+
+TEMPERATURE BAR:
+- Container: rounded-xl, bg rgba(255,255,255,0.08), padding 16px
+- Bar: 6px height, #E5E5EA background
+- Fill: gradient from #636366 to #8E8E93
+- Current indicator: 6px white circle with dark border
+- Moon phase indicators: 12px circles, dark fill, white border
+
+FORECAST GRID:
+- 8 columns, centered content
+- Day label (TODAY, THU, FRI...)
+- Weather icon (cloud, rain drops, snow dots, wind pill)
+- High temp in white
+- Low temp in gray (#8E8E93)
+
+WEATHER ICONS:
+- Wind: Red pill (#FF453A) with wind icon inside
+- Cloudy: White filled cloud
+- Rain: White cloud + 3 blue vertical drops below
+- Snow: White cloud + 3 blue dots below
+- Sunny: Yellow sun icon
+- Christmas: White cloud with red santa hat
+
+MOON PHASE:
+- Circle with gradient: left half dark, right half light
+- Overlay circle creates crescent effect
+- ~56px diameter
+
+Use lucide-react icons. The noise texture SVG can be inline as a data URI.

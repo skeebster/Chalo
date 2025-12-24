@@ -3,8 +3,8 @@ import { Place } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Cloud, Sun, CloudRain, Snowflake, Wind, Thermometer, Umbrella, TreePine, Home as HomeIcon } from "lucide-react";
-import { isSaturday, isSunday, nextSaturday, format } from "date-fns";
+import { Cloud, Sun, CloudRain, Snowflake, Wind, Thermometer, Umbrella, TreePine, Home as HomeIcon, Droplets } from "lucide-react";
+import { isSaturday, isSunday, nextSaturday, format, isToday, addDays } from "date-fns";
 
 interface WeatherData {
   current_weather: {
@@ -160,42 +160,157 @@ export function WeatherSuggestions({ places, onPlaceClick }: WeatherSuggestionsP
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-4 p-4 rounded-xl bg-background/50">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400/20 to-purple-400/20 flex items-center justify-center">
-            <WeatherIcon className="w-8 h-8 text-blue-400" />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <span className="text-3xl font-bold text-white">{displayTemp}°F</span>
-              {!isWeekend && (
-                <span className="text-sm text-muted-foreground">
-                  High: {Math.round(dayWeather.high)}° / Low: {Math.round(dayWeather.low)}°
+        {/* iOS-Style 7-Day Week View Widget */}
+        <div 
+          className="relative rounded-3xl p-5 overflow-hidden"
+          style={{ 
+            background: '#2C2C2E',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+            fontFamily: '-apple-system, "SF Pro Display", system-ui, sans-serif'
+          }}
+        >
+          {/* Noise texture overlay */}
+          <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-[0.04]" style={{ mixBlendMode: 'overlay' }}>
+            <filter id="noise">
+              <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" stitchTiles="stitch"/>
+            </filter>
+            <rect width="100%" height="100%" filter="url(#noise)"/>
+          </svg>
+
+          {/* Header - Current Weather */}
+          <div className="relative z-10 flex items-start justify-between mb-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: '#8E8E93' }}>
+                Somerset, NJ
+              </p>
+              <div className="flex items-baseline gap-1">
+                <span 
+                  className="font-extralight leading-none"
+                  style={{ 
+                    fontSize: '72px', 
+                    color: '#FFFFFF',
+                    letterSpacing: '-0.05em',
+                    fontWeight: 200
+                  }}
+                >
+                  {displayTemp}°
                 </span>
+              </div>
+              <p className="text-lg font-semibold text-white mt-1">{weatherDesc}</p>
+              <p className="text-sm" style={{ color: '#8E8E93' }}>
+                H:{Math.round(dayWeather.high)}° L:{Math.round(dayWeather.low)}°
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <WeatherIcon className="w-10 h-10 text-white opacity-80" />
+              {goodForOutdoor ? (
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full" style={{ background: 'rgba(52, 199, 89, 0.2)' }}>
+                  <TreePine className="w-3 h-3" style={{ color: '#34C759' }} />
+                  <span className="text-[10px] font-semibold" style={{ color: '#34C759' }}>Outdoor</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full" style={{ background: 'rgba(255, 149, 0, 0.2)' }}>
+                  <HomeIcon className="w-3 h-3" style={{ color: '#FF9500' }} />
+                  <span className="text-[10px] font-semibold" style={{ color: '#FF9500' }}>Indoor</span>
+                </div>
               )}
             </div>
-            <p className="text-muted-foreground">{weatherDesc}</p>
-            {dayWeather.precipProb > 20 && (
-              <div className="flex items-center gap-1 text-sm text-blue-400 mt-1">
-                <Umbrella className="w-3 h-3" />
-                <span>{dayWeather.precipProb}% chance of rain</span>
-              </div>
-            )}
           </div>
-          <div className="text-right">
-            {goodForOutdoor ? (
-              <div className="flex items-center gap-1 text-green-400">
-                <TreePine className="w-4 h-4" />
-                <span className="text-sm font-medium">Outdoor</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1 text-amber-400">
-                <HomeIcon className="w-4 h-4" />
-                <span className="text-sm font-medium">Indoor</span>
-              </div>
-            )}
+
+          {/* Temperature Range Bar */}
+          <div 
+            className="relative z-10 rounded-xl p-3 mb-4"
+            style={{ background: 'rgba(255,255,255,0.08)' }}
+          >
+            <div className="flex items-center justify-between text-xs mb-2" style={{ color: '#636366' }}>
+              <span>{Math.round(Math.min(...weather.daily.temperature_2m_min))}°</span>
+              <span>Temperature Range</span>
+              <span>{Math.round(Math.max(...weather.daily.temperature_2m_max))}°</span>
+            </div>
+            <div className="relative h-1.5 rounded-full" style={{ background: '#3A3A3C' }}>
+              <div 
+                className="absolute h-full rounded-full"
+                style={{ 
+                  background: 'linear-gradient(to right, #636366, #8E8E93)',
+                  left: `${((dayWeather.low - Math.min(...weather.daily.temperature_2m_min)) / (Math.max(...weather.daily.temperature_2m_max) - Math.min(...weather.daily.temperature_2m_min))) * 100}%`,
+                  right: `${100 - ((dayWeather.high - Math.min(...weather.daily.temperature_2m_min)) / (Math.max(...weather.daily.temperature_2m_max) - Math.min(...weather.daily.temperature_2m_min))) * 100}%`
+                }}
+              />
+              <div 
+                className="absolute w-2 h-2 rounded-full bg-white border border-zinc-700 -translate-y-0.5"
+                style={{
+                  left: `${((displayTemp - Math.min(...weather.daily.temperature_2m_min)) / (Math.max(...weather.daily.temperature_2m_max) - Math.min(...weather.daily.temperature_2m_min))) * 100}%`,
+                  transform: 'translateX(-50%) translateY(-25%)'
+                }}
+              />
+            </div>
+          </div>
+
+          {/* 7-Day Forecast Grid */}
+          <div className="relative z-10 grid grid-cols-7 gap-1">
+            {weather.daily.time.slice(0, 7).map((dateStr, i) => {
+              const date = new Date(dateStr + 'T00:00:00');
+              const DayIcon = getWeatherIcon(weather.daily.weathercode[i]);
+              const high = Math.round(weather.daily.temperature_2m_max[i]);
+              const low = Math.round(weather.daily.temperature_2m_min[i]);
+              const precipProb = weather.daily.precipitation_probability_max[i];
+              const isRainy = [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(weather.daily.weathercode[i]);
+              const isSnowy = [71, 73, 75, 77, 85, 86].includes(weather.daily.weathercode[i]);
+              const isWindy = weather.daily.weathercode[i] >= 95;
+              
+              return (
+                <div 
+                  key={dateStr}
+                  className="flex flex-col items-center py-2 px-1 rounded-xl transition-colors"
+                  style={{ 
+                    background: i === dayIndex ? 'rgba(255,255,255,0.08)' : 'transparent'
+                  }}
+                >
+                  <span 
+                    className="text-[10px] font-semibold mb-2"
+                    style={{ color: i === 0 ? '#FFFFFF' : '#636366' }}
+                  >
+                    {i === 0 ? 'TODAY' : format(date, 'EEE').toUpperCase()}
+                  </span>
+                  
+                  <div className="relative mb-2">
+                    {isWindy ? (
+                      <div 
+                        className="flex items-center justify-center rounded-full px-1.5 py-0.5"
+                        style={{ background: '#FF453A' }}
+                      >
+                        <Wind className="w-3.5 h-3.5 text-white" />
+                      </div>
+                    ) : (
+                      <>
+                        <DayIcon 
+                          className="w-5 h-5" 
+                          style={{ color: weather.daily.weathercode[i] === 0 || weather.daily.weathercode[i] === 1 ? '#FFD60A' : '#FFFFFF' }} 
+                        />
+                        {(isRainy || isSnowy) && (
+                          <div className="flex gap-0.5 mt-0.5 justify-center">
+                            {[0, 1, 2].map(j => (
+                              <div 
+                                key={j}
+                                className="w-0.5 h-1.5 rounded-full"
+                                style={{ background: '#32ADE6' }}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  
+                  <span className="text-sm font-medium text-white">{high}°</span>
+                  <span className="text-sm" style={{ color: '#8E8E93' }}>{low}°</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
+        {/* Place Suggestions */}
         <div>
           <p className="text-sm text-muted-foreground mb-3">{suggestionMessage}</p>
           {suggestedPlaces.length > 0 ? (
