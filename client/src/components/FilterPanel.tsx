@@ -39,61 +39,65 @@ export function FilterPanel({ filters, onFiltersChange }: FilterPanelProps) {
     <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
       <div className="flex items-center gap-2">
         <CollapsibleTrigger asChild>
-          <Button variant="outline" className="gap-2" data-testid="button-toggle-filters">
-            <Filter className="w-4 h-4" />
-            Filters
+          <Button variant="outline" size="sm" className="gap-1.5 sm:gap-2 text-xs sm:text-sm" data-testid="button-toggle-filters">
+            <Filter className="w-3 sm:w-4 h-3 sm:h-4" />
+            <span className="hidden sm:inline">Filters</span>
             {activeFilterCount > 0 && (
-              <Badge variant="secondary" className="ml-1 text-xs">{activeFilterCount}</Badge>
+              <Badge variant="secondary" className="ml-0.5 sm:ml-1 text-[10px] sm:text-xs">{activeFilterCount}</Badge>
             )}
-            {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {isOpen ? <ChevronUp className="w-3 sm:w-4 h-3 sm:h-4" /> : <ChevronDown className="w-3 sm:w-4 h-3 sm:h-4" />}
           </Button>
         </CollapsibleTrigger>
         
         {activeFilterCount > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1 text-muted-foreground" data-testid="button-clear-filters">
-            <X className="w-4 h-4" />
-            Clear all
+          <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1 text-muted-foreground text-xs sm:text-sm" data-testid="button-clear-filters">
+            <X className="w-3 sm:w-4 h-3 sm:h-4" />
+            <span className="hidden sm:inline">Clear all</span>
+            <span className="sm:hidden">Clear</span>
           </Button>
         )}
       </div>
 
-      <CollapsibleContent className="mt-4">
-        <div className="bg-card border border-white/10 rounded-xl p-4 space-y-6">
+      <CollapsibleContent className="mt-3 sm:mt-4">
+        <div className="bg-card border border-white/10 rounded-xl p-3 sm:p-4 space-y-4 sm:space-y-6">
           {/* Quick Toggles */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium text-white">Quick Filters</Label>
-            <div className="flex flex-wrap gap-2">
+          <div className="space-y-2 sm:space-y-3">
+            <Label className="text-xs sm:text-sm font-medium text-white">Quick Filters</Label>
+            <div className="flex flex-wrap gap-1.5 sm:gap-2">
               <Button
                 variant={filters.kidFriendly ? "default" : "outline"}
                 size="sm"
-                className="gap-2"
+                className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-8"
                 onClick={() => onFiltersChange({ ...filters, kidFriendly: !filters.kidFriendly })}
                 data-testid="button-filter-kid-friendly"
               >
-                <Baby className="w-4 h-4" />
-                Kid Friendly
+                <Baby className="w-3 sm:w-4 h-3 sm:h-4" />
+                <span className="hidden sm:inline">Kid Friendly</span>
+                <span className="sm:hidden">Kids</span>
               </Button>
 
               <Button
                 variant={filters.favoritesOnly ? "default" : "outline"}
                 size="sm"
-                className="gap-2"
+                className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-8"
                 onClick={() => onFiltersChange({ ...filters, favoritesOnly: !filters.favoritesOnly })}
                 data-testid="button-filter-favorites"
               >
-                <Heart className="w-4 h-4" />
-                Favorites Only
+                <Heart className="w-3 sm:w-4 h-3 sm:h-4" />
+                <span className="hidden sm:inline">Favorites Only</span>
+                <span className="sm:hidden">Favs</span>
               </Button>
             </div>
           </div>
 
           {/* Indoor/Outdoor */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium text-white">Setting</Label>
-            <div className="flex gap-2">
+          <div className="space-y-2 sm:space-y-3">
+            <Label className="text-xs sm:text-sm font-medium text-white">Setting</Label>
+            <div className="flex gap-1.5 sm:gap-2">
               <Button
                 variant={!filters.indoorOutdoor || filters.indoorOutdoor === 'all' ? "default" : "outline"}
                 size="sm"
+                className="text-xs sm:text-sm h-8"
                 onClick={() => onFiltersChange({ ...filters, indoorOutdoor: 'all' })}
                 data-testid="button-filter-setting-all"
               >
@@ -102,35 +106,35 @@ export function FilterPanel({ filters, onFiltersChange }: FilterPanelProps) {
               <Button
                 variant={filters.indoorOutdoor === 'indoor' ? "default" : "outline"}
                 size="sm"
-                className="gap-2"
+                className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-8"
                 onClick={() => onFiltersChange({ ...filters, indoorOutdoor: 'indoor' })}
                 data-testid="button-filter-setting-indoor"
               >
-                <Home className="w-4 h-4" />
+                <Home className="w-3 sm:w-4 h-3 sm:h-4" />
                 Indoor
               </Button>
               <Button
                 variant={filters.indoorOutdoor === 'outdoor' ? "default" : "outline"}
                 size="sm"
-                className="gap-2"
+                className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-8"
                 onClick={() => onFiltersChange({ ...filters, indoorOutdoor: 'outdoor' })}
                 data-testid="button-filter-setting-outdoor"
               >
-                <TreePine className="w-4 h-4" />
+                <TreePine className="w-3 sm:w-4 h-3 sm:h-4" />
                 Outdoor
               </Button>
             </div>
           </div>
 
           {/* Distance Range */}
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium text-white flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-primary" />
+              <Label className="text-xs sm:text-sm font-medium text-white flex items-center gap-1.5 sm:gap-2">
+                <MapPin className="w-3 sm:w-4 h-3 sm:h-4 text-primary" />
                 Max Distance
               </Label>
-              <span className="text-sm text-muted-foreground">
-                {filters.maxDistance ? `${filters.maxDistance} miles` : 'Any distance'}
+              <span className="text-xs sm:text-sm text-muted-foreground">
+                {filters.maxDistance ? `${filters.maxDistance} mi` : 'Any'}
               </span>
             </div>
             <Slider
@@ -150,14 +154,14 @@ export function FilterPanel({ filters, onFiltersChange }: FilterPanelProps) {
           </div>
 
           {/* Min Rating */}
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium text-white flex items-center gap-2">
-                <Star className="w-4 h-4 text-yellow-400" />
+              <Label className="text-xs sm:text-sm font-medium text-white flex items-center gap-1.5 sm:gap-2">
+                <Star className="w-3 sm:w-4 h-3 sm:h-4 text-yellow-400" />
                 Min Rating
               </Label>
-              <span className="text-sm text-muted-foreground">
-                {filters.minRating ? `${filters.minRating}+ stars` : 'Any rating'}
+              <span className="text-xs sm:text-sm text-muted-foreground">
+                {filters.minRating ? `${filters.minRating}+` : 'Any'}
               </span>
             </div>
             <Slider

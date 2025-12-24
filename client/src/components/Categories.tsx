@@ -22,7 +22,7 @@ export function Categories({ selectedCategory, onSelect }: CategoriesProps) {
   ];
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-4 pt-2 scrollbar-none mask-fade-right">
+    <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-2 sm:pb-4 pt-1 sm:pt-2 scrollbar-none mask-fade-right">
       {categories.map((cat) => {
         const isActive = selectedCategory === cat.id;
         const Icon = cat.icon;
@@ -32,13 +32,13 @@ export function Categories({ selectedCategory, onSelect }: CategoriesProps) {
             key={cat.id}
             onClick={() => onSelect(cat.id)}
             className={cn(
-              "flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition-all whitespace-nowrap border",
+              "flex items-center gap-1 sm:gap-2 px-2.5 sm:px-5 py-1.5 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium transition-all whitespace-nowrap border",
               isActive
                 ? "bg-primary border-primary text-white shadow-lg shadow-primary/25 scale-105"
                 : "bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-white"
             )}
           >
-            <Icon className="w-4 h-4" />
+            <Icon className="w-3 sm:w-4 h-3 sm:h-4" />
             {cat.label}
           </button>
         );
