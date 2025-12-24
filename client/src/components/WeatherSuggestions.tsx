@@ -159,142 +159,75 @@ export function WeatherSuggestions({ places, onPlaceClick }: WeatherSuggestionsP
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* iOS-Style 7-Day Week View Widget */}
-        <div 
-          className="relative rounded-3xl p-5 overflow-hidden"
-          style={{ 
-            background: '#2C2C2E',
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-            fontFamily: '-apple-system, "SF Pro Display", system-ui, sans-serif'
-          }}
-        >
+      <CardContent className="space-y-3 pt-3">
+        {/* Compact iOS-Style Week View */}
+        <div className="relative rounded-xl p-3 bg-card/80 border border-border/50 overflow-hidden">
           {/* Noise texture overlay */}
-          <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-[0.04]" style={{ mixBlendMode: 'overlay' }}>
+          <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-[0.03]" style={{ mixBlendMode: 'overlay' }}>
             <filter id="noise">
               <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" stitchTiles="stitch"/>
             </filter>
             <rect width="100%" height="100%" filter="url(#noise)"/>
           </svg>
 
-          {/* Header - Current Weather */}
-          <div className="relative z-10 flex items-start justify-between mb-4">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: '#8E8E93' }}>
-                Somerset, NJ
-              </p>
-              <div className="flex items-baseline gap-1">
-                <span 
-                  className="font-extralight leading-none"
-                  style={{ 
-                    fontSize: '72px', 
-                    color: '#FFFFFF',
-                    letterSpacing: '-0.05em',
-                    fontWeight: 200
-                  }}
-                >
-                  {displayTemp}°
-                </span>
+          {/* Header Row */}
+          <div className="relative z-10 flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <WeatherIcon className="w-7 h-7 text-primary" />
+                <span className="text-3xl font-light text-foreground tracking-tight">{displayTemp}°</span>
               </div>
-              <p className="text-lg font-semibold text-white mt-1">{weatherDesc}</p>
-              <p className="text-sm" style={{ color: '#8E8E93' }}>
-                H:{Math.round(dayWeather.high)}° L:{Math.round(dayWeather.low)}°
-              </p>
+              <div className="text-sm">
+                <p className="text-foreground font-medium">{weatherDesc}</p>
+                <p className="text-muted-foreground text-xs">H:{Math.round(dayWeather.high)}° L:{Math.round(dayWeather.low)}°</p>
+              </div>
             </div>
-            <div className="flex flex-col items-end gap-2">
-              <WeatherIcon className="w-10 h-10 text-white opacity-80" />
-              {goodForOutdoor ? (
-                <div className="flex items-center gap-1 px-2 py-1 rounded-full" style={{ background: 'rgba(52, 199, 89, 0.2)' }}>
-                  <TreePine className="w-3 h-3" style={{ color: '#34C759' }} />
-                  <span className="text-[10px] font-semibold" style={{ color: '#34C759' }}>Outdoor</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1 px-2 py-1 rounded-full" style={{ background: 'rgba(255, 149, 0, 0.2)' }}>
-                  <HomeIcon className="w-3 h-3" style={{ color: '#FF9500' }} />
-                  <span className="text-[10px] font-semibold" style={{ color: '#FF9500' }}>Indoor</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Temperature Range Bar */}
-          <div 
-            className="relative z-10 rounded-xl p-3 mb-4"
-            style={{ background: 'rgba(255,255,255,0.08)' }}
-          >
-            <div className="flex items-center justify-between text-xs mb-2" style={{ color: '#636366' }}>
-              <span>{Math.round(Math.min(...weather.daily.temperature_2m_min))}°</span>
-              <span>Temperature Range</span>
-              <span>{Math.round(Math.max(...weather.daily.temperature_2m_max))}°</span>
-            </div>
-            <div className="relative h-1.5 rounded-full" style={{ background: '#3A3A3C' }}>
-              <div 
-                className="absolute h-full rounded-full"
-                style={{ 
-                  background: 'linear-gradient(to right, #636366, #8E8E93)',
-                  left: `${((dayWeather.low - Math.min(...weather.daily.temperature_2m_min)) / (Math.max(...weather.daily.temperature_2m_max) - Math.min(...weather.daily.temperature_2m_min))) * 100}%`,
-                  right: `${100 - ((dayWeather.high - Math.min(...weather.daily.temperature_2m_min)) / (Math.max(...weather.daily.temperature_2m_max) - Math.min(...weather.daily.temperature_2m_min))) * 100}%`
-                }}
-              />
-              <div 
-                className="absolute w-2 h-2 rounded-full bg-white border border-zinc-700 -translate-y-0.5"
-                style={{
-                  left: `${((displayTemp - Math.min(...weather.daily.temperature_2m_min)) / (Math.max(...weather.daily.temperature_2m_max) - Math.min(...weather.daily.temperature_2m_min))) * 100}%`,
-                  transform: 'translateX(-50%) translateY(-25%)'
-                }}
-              />
-            </div>
+            {goodForOutdoor ? (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/20">
+                <TreePine className="w-3 h-3 text-green-400" />
+                <span className="text-[10px] font-semibold text-green-400">Outdoor</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-primary/20">
+                <HomeIcon className="w-3 h-3 text-primary" />
+                <span className="text-[10px] font-semibold text-primary">Indoor</span>
+              </div>
+            )}
           </div>
 
           {/* 7-Day Forecast Grid */}
-          <div className="relative z-10 grid grid-cols-7 gap-1">
+          <div className="relative z-10 grid grid-cols-7 gap-0.5 bg-muted/30 rounded-lg p-1">
             {weather.daily.time.slice(0, 7).map((dateStr, i) => {
               const date = new Date(dateStr + 'T00:00:00');
               const DayIcon = getWeatherIcon(weather.daily.weathercode[i]);
               const high = Math.round(weather.daily.temperature_2m_max[i]);
               const low = Math.round(weather.daily.temperature_2m_min[i]);
-              const precipProb = weather.daily.precipitation_probability_max[i];
               const isRainy = [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(weather.daily.weathercode[i]);
               const isSnowy = [71, 73, 75, 77, 85, 86].includes(weather.daily.weathercode[i]);
               const isWindy = weather.daily.weathercode[i] >= 95;
+              const isSunny = weather.daily.weathercode[i] === 0 || weather.daily.weathercode[i] === 1;
               
               return (
                 <div 
                   key={dateStr}
-                  className="flex flex-col items-center py-2 px-1 rounded-xl transition-colors"
-                  style={{ 
-                    background: i === dayIndex ? 'rgba(255,255,255,0.08)' : 'transparent'
-                  }}
+                  className={`flex flex-col items-center py-1.5 px-0.5 rounded-md transition-colors ${i === dayIndex ? 'bg-primary/20' : ''}`}
                 >
-                  <span 
-                    className="text-[10px] font-semibold mb-2"
-                    style={{ color: i === 0 ? '#FFFFFF' : '#636366' }}
-                  >
-                    {i === 0 ? 'TODAY' : format(date, 'EEE').toUpperCase()}
+                  <span className={`text-[9px] font-semibold ${i === 0 ? 'text-primary' : 'text-muted-foreground'}`}>
+                    {i === 0 ? 'NOW' : format(date, 'EEE').toUpperCase().slice(0, 2)}
                   </span>
                   
-                  <div className="relative mb-2">
+                  <div className="relative my-1">
                     {isWindy ? (
-                      <div 
-                        className="flex items-center justify-center rounded-full px-1.5 py-0.5"
-                        style={{ background: '#FF453A' }}
-                      >
-                        <Wind className="w-3.5 h-3.5 text-white" />
+                      <div className="flex items-center justify-center rounded-full px-1 py-0.5 bg-red-500/80">
+                        <Wind className="w-3 h-3 text-white" />
                       </div>
                     ) : (
                       <>
-                        <DayIcon 
-                          className="w-5 h-5" 
-                          style={{ color: weather.daily.weathercode[i] === 0 || weather.daily.weathercode[i] === 1 ? '#FFD60A' : '#FFFFFF' }} 
-                        />
+                        <DayIcon className={`w-4 h-4 ${isSunny ? 'text-amber-400' : 'text-muted-foreground'}`} />
                         {(isRainy || isSnowy) && (
-                          <div className="flex gap-0.5 mt-0.5 justify-center">
+                          <div className="flex gap-px justify-center">
                             {[0, 1, 2].map(j => (
-                              <div 
-                                key={j}
-                                className="w-0.5 h-1.5 rounded-full"
-                                style={{ background: '#32ADE6' }}
-                              />
+                              <div key={j} className="w-0.5 h-1 rounded-full bg-blue-400" />
                             ))}
                           </div>
                         )}
@@ -302,8 +235,8 @@ export function WeatherSuggestions({ places, onPlaceClick }: WeatherSuggestionsP
                     )}
                   </div>
                   
-                  <span className="text-sm font-medium text-white">{high}°</span>
-                  <span className="text-sm" style={{ color: '#8E8E93' }}>{low}°</span>
+                  <span className="text-[10px] font-medium text-foreground">{high}°</span>
+                  <span className="text-[9px] text-muted-foreground">{low}°</span>
                 </div>
               );
             })}
@@ -312,24 +245,24 @@ export function WeatherSuggestions({ places, onPlaceClick }: WeatherSuggestionsP
 
         {/* Place Suggestions */}
         <div>
-          <p className="text-sm text-muted-foreground mb-3">{suggestionMessage}</p>
+          <p className="text-xs text-muted-foreground mb-2">{suggestionMessage}</p>
           {suggestedPlaces.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {suggestedPlaces.map((place) => (
                 <button
                   key={place.id}
                   onClick={() => onPlaceClick(place)}
-                  className="text-left p-3 rounded-xl bg-background/30 hover-elevate transition-all"
+                  className="text-left p-2 rounded-lg bg-muted/30 hover-elevate transition-all"
                   data-testid={`weather-suggestion-${place.id}`}
                 >
-                  <p className="font-medium text-white text-sm truncate">{place.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{place.category}</p>
+                  <p className="font-medium text-foreground text-xs truncate">{place.name}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{place.category}</p>
                 </button>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              No {goodForOutdoor ? "outdoor" : "indoor"} places found. Try adding more destinations!
+            <p className="text-xs text-muted-foreground">
+              No {goodForOutdoor ? "outdoor" : "indoor"} places found.
             </p>
           )}
         </div>
