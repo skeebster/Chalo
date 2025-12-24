@@ -67,16 +67,16 @@ export default function Home() {
 
         <div className="space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-4 flex-wrap">
-              <h2 className="text-2xl font-display font-bold text-white">
+            <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+              <h2 className="text-xl sm:text-2xl font-display font-bold text-white">
                 Explore Destinations
               </h2>
               <Select 
                 value={filters.sort || "newest"} 
                 onValueChange={(value) => setFilters(prev => ({ ...prev, sort: value }))}
               >
-                <SelectTrigger className="w-[180px]" data-testid="select-sort">
-                  <ArrowUpDown className="w-4 h-4 mr-2 text-muted-foreground" />
+                <SelectTrigger className="w-[140px] sm:w-[180px] h-8 sm:h-9 text-xs sm:text-sm" data-testid="select-sort">
+                  <ArrowUpDown className="w-3 sm:w-4 h-3 sm:h-4 mr-1 sm:mr-2 text-muted-foreground" />
                   <SelectValue placeholder="Sort by..." />
                 </SelectTrigger>
                 <SelectContent>

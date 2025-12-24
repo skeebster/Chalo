@@ -43,7 +43,7 @@ export function PlaceCard({ place, onClick }: PlaceCardProps) {
       }`}
       data-testid={`card-place-${place.id}`}
     >
-      <div className="relative h-48 overflow-hidden">
+      <div className="relative h-32 sm:h-48 overflow-hidden">
         <img
           src={image}
           alt={place.name}
@@ -51,54 +51,54 @@ export function PlaceCard({ place, onClick }: PlaceCardProps) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60" />
         
-        <div className="absolute top-3 right-3 flex gap-2">
+        <div className="absolute top-2 sm:top-3 right-2 sm:right-3 flex gap-1 sm:gap-2">
           {isHighlyRated && (
-            <Badge className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-bold border-0">
+            <Badge className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-bold border-0 text-[10px] sm:text-xs px-1.5 sm:px-2">
               Top Rated
             </Badge>
           )}
-          <Badge variant="secondary" className="bg-black/50 backdrop-blur-md border-white/10 text-white hover:bg-black/60">
+          <Badge variant="secondary" className="bg-black/50 backdrop-blur-md border-white/10 text-white hover:bg-black/60 text-[10px] sm:text-xs px-1.5 sm:px-2">
             {place.category || "General"}
           </Badge>
         </div>
 
-        <div className="absolute bottom-3 left-3 flex items-center gap-2">
+        <div className="absolute bottom-2 sm:bottom-3 left-2 sm:left-3 flex items-center gap-1 sm:gap-2">
           {place.distanceMiles && (
-            <div className="flex items-center gap-1 text-xs font-medium text-white/90 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-md">
-              <Car className="w-3 h-3" />
+            <div className="flex items-center gap-1 text-[10px] sm:text-xs font-medium text-white/90 bg-black/40 backdrop-blur-sm px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md">
+              <Car className="w-2.5 sm:w-3 h-2.5 sm:h-3" />
               {place.distanceMiles} mi
             </div>
           )}
           {weather && (
             <div 
-              className="flex items-center gap-1 text-xs font-medium text-white/90 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-md"
+              className="flex items-center gap-1 text-[10px] sm:text-xs font-medium text-white/90 bg-black/40 backdrop-blur-sm px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md"
               title={`${weather.isWeekend ? 'Today' : 'This weekend'}: ${weather.description}, High ${weather.high}°F / Low ${weather.low}°F${weather.precipProb > 20 ? `, ${weather.precipProb}% rain` : ''}`}
             >
-              <WeatherIcon code={weather.code} className="w-3 h-3" />
+              <WeatherIcon code={weather.code} className="w-2.5 sm:w-3 h-2.5 sm:h-3" />
               <span>{weather.temp}°F</span>
             </div>
           )}
         </div>
       </div>
 
-      <div className="p-5 flex-1 flex flex-col">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="font-display font-bold text-lg leading-tight text-white group-hover:text-primary transition-colors line-clamp-2">
+      <div className="p-3 sm:p-5 flex-1 flex flex-col">
+        <div className="flex justify-between items-start gap-2 mb-1.5 sm:mb-2">
+          <h3 className="font-display font-bold text-sm sm:text-lg leading-tight text-white group-hover:text-primary transition-colors line-clamp-2">
             {place.name}
           </h3>
           {place.googleRating && (
-            <div className="flex items-center gap-1 text-yellow-500 text-sm font-bold bg-yellow-500/10 px-1.5 py-0.5 rounded">
-              <Star className="w-3.5 h-3.5 fill-current" />
+            <div className="flex items-center gap-1 text-yellow-500 text-xs sm:text-sm font-bold bg-yellow-500/10 px-1.5 py-0.5 rounded shrink-0">
+              <Star className="w-3 sm:w-3.5 h-3 sm:h-3.5 fill-current" />
               {place.googleRating}
             </div>
           )}
         </div>
 
-        <p className="text-muted-foreground text-sm line-clamp-3 mb-4 flex-1">
+        <p className="text-muted-foreground text-xs sm:text-sm line-clamp-2 sm:line-clamp-3 mb-2 sm:mb-4 flex-1">
           {place.overview || place.keyHighlights}
         </p>
 
-        <div className="flex items-center gap-4 text-xs text-muted-foreground border-t border-border/50 pt-4 mt-auto">
+        <div className="flex items-center gap-2 sm:gap-4 text-xs text-muted-foreground border-t border-border/50 pt-2 sm:pt-4 mt-auto">
           {place.driveTimeMinutes && (
             <button
               className="flex items-center gap-1.5 hover:text-primary transition-colors"
