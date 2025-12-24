@@ -72,19 +72,27 @@ function VerticalTimeline({
   getActivityIcon,
   getActivityColor,
 }: VerticalTimelineProps) {
-  const minTime = Math.min(...schedule.map(a => parseTimeToMinutes(a.time)));
-  const maxTime = Math.max(...schedule.map(a => {
+  const [zoomLevel, setZoomLevel] = useState(4); // 4px per minute baseline
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const timelineRef = useState<HTMLDivElement | null>(null)[1];
+
+  const minActivityTime = Math.min(...schedule.map(a => parseTimeToMinutes(a.time)));
+  const maxActivityTime = Math.max(...schedule.map(a => {
     if (a.endTime) return parseTimeToMinutes(a.endTime);
     if (a.duration) return parseTimeToMinutes(a.time) + a.duration;
     return parseTimeToMinutes(a.time) + 60;
   }));
   
-  const totalMinutes = maxTime - minTime || 60;
-  const timelineHeight = Math.max(600, Math.ceil(totalMinutes / 60) * 120); // 120px per hour minimum
+  // Start 1 hour before, end 1 hour after
+  const minTime = Math.max(0, minActivityTime - 60);
+  const maxTime = maxActivityTime + 60;
+  const totalMinutes = maxTime - minTime;
+  
+  const timelineHeight = totalMinutes * zoomLevel;
   
   const getPosition = (timeStr: string) => {
     const minutes = parseTimeToMinutes(timeStr);
-    return ((minutes - minTime) / totalMinutes) * 100;
+    return (minutes - minTime) * zoomLevel;
   };
   
   const getDuration = (activity: ItineraryActivity) => {
@@ -95,9 +103,8 @@ function VerticalTimeline({
     return 60;
   };
   
-  const getHeight = (activity: ItineraryActivity) => {
-    const duration = getDuration(activity);
-    return (duration / totalMinutes) * 100;
+  const getHeightPx = (activity: ItineraryActivity) => {
+    return getDuration(activity) * zoomLevel;
   };
   
   const formatTimeLabel = (minutes: number) => {
@@ -106,54 +113,103 @@ function VerticalTimeline({
     return `${hours % 12 || 12}:${mins.toString().padStart(2, '0')} ${hours >= 12 ? 'PM' : 'AM'}`;
   };
 
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const newZoom = Math.max(1, Math.min(10, zoomLevel + (e.deltaY > 0 ? -0.5 : 0.5)));
+    setZoomLevel(newZoom);
+  };
+
   return (
-    <div className="rounded-lg border border-border/30 overflow-hidden">
-      <div className="flex gap-4 p-4" style={{ minHeight: `${timelineHeight + 100}px` }}>
+    <div className="rounded-lg border border-border/30 overflow-hidden flex flex-col">
+      <div className="text-xs text-muted-foreground px-4 py-2 bg-muted/30 border-b border-border/30 flex items-center justify-between">
+        <span>Scroll to zoom • Drag to adjust time</span>
+        <span>Zoom: {zoomLevel.toFixed(1)}x</span>
+      </div>
+      
+      <div className="flex gap-0 overflow-hidden flex-1" onWheel={handleWheel}>
         {/* Time Scale - Left Side */}
-        <div className="w-16 shrink-0 relative">
-          <div className="sticky top-0 bg-background/80 backdrop-blur z-10">
-            <span className="text-xs font-semibold text-muted-foreground">Time</span>
+        <div className="w-20 shrink-0 bg-muted/50 border-r border-border/30 overflow-hidden">
+          <div className="sticky top-0 bg-muted/80 backdrop-blur z-10 py-2 px-2 border-b border-border/30 text-xs font-semibold text-muted-foreground">
+            Time
           </div>
           <div style={{ height: `${timelineHeight}px`, position: 'relative' }}>
-            {Array.from({ length: Math.ceil(totalMinutes / 60) + 1 }).map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  position: 'absolute',
-                  top: `${(i / Math.ceil(totalMinutes / 60)) * 100}%`,
-                  width: '100%',
-                }}
-              >
-                <span className="text-[10px] text-muted-foreground/60 whitespace-nowrap">
-                  {formatTimeLabel(minTime + i * 60)}
-                </span>
-              </div>
-            ))}
+            {/* Hour markers */}
+            {Array.from({ length: Math.ceil(totalMinutes / 60) + 1 }).map((_, i) => {
+              const currentMinutes = minTime + i * 60;
+              return (
+                <div
+                  key={`hour-${i}`}
+                  style={{
+                    position: 'absolute',
+                    top: `${currentMinutes * zoomLevel}px`,
+                    height: '60px',
+                  }}
+                  className="relative"
+                >
+                  <span className="text-[10px] text-muted-foreground/80 font-semibold px-1 py-0.5 block">
+                    {formatTimeLabel(currentMinutes)}
+                  </span>
+                  
+                  {/* 15-minute sub-markers */}
+                  {[15, 30, 45].map(offset => (
+                    <div
+                      key={`marker-${i}-${offset}`}
+                      style={{
+                        position: 'absolute',
+                        top: `${offset * zoomLevel}px`,
+                        left: 0,
+                        right: 0,
+                      }}
+                    >
+                      <span className="text-[8px] text-muted-foreground/40 px-1">
+                        :{offset.toString().padStart(2, '0')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
           </div>
         </div>
 
         {/* Activities Timeline - Right Side */}
-        <div className="flex-1 relative">
-          {/* Hour grid lines */}
-          {Array.from({ length: Math.ceil(totalMinutes / 60) }).map((_, i) => (
-            <div
-              key={`grid-${i}`}
-              className="absolute left-0 right-0 border-b border-border/30"
-              style={{
-                top: `${(i / Math.ceil(totalMinutes / 60)) * 100}%`,
-                height: `${(60 / totalMinutes) * 100}%`,
-              }}
-            />
-          ))}
+        <div className="flex-1 relative overflow-y-auto" style={{ height: '600px' }}>
+          {/* Hour grid lines and 15-min grid */}
+          <div style={{ height: `${timelineHeight}px`, position: 'relative' }} className="bg-background">
+            {/* Main hour lines */}
+            {Array.from({ length: Math.ceil(totalMinutes / 60) }).map((_, i) => (
+              <div
+                key={`grid-hour-${i}`}
+                className="absolute left-0 right-0 border-b border-border/40"
+                style={{
+                  top: `${(minTime + i * 60) * zoomLevel}px`,
+                  height: `${60 * zoomLevel}px`,
+                }}
+              />
+            ))}
+            
+            {/* 15-minute grid lines (lighter) */}
+            {Array.from({ length: Math.ceil(totalMinutes / 15) }).map((_, i) => {
+              if (i % 4 === 0) return null; // Skip hour markers (already drawn above)
+              return (
+                <div
+                  key={`grid-15min-${i}`}
+                  className="absolute left-0 right-0 border-b border-border/20"
+                  style={{
+                    top: `${(minTime + i * 15) * zoomLevel}px`,
+                    height: `${15 * zoomLevel}px`,
+                  }}
+                />
+              );
+            })}
 
-          {/* Activities */}
-          <div style={{ height: `${timelineHeight}px`, position: 'relative' }}>
+            {/* Activities */}
             {schedule.map((activity, index) => {
               const Icon = getActivityIcon(activity.type);
               const colorClass = getActivityColor(activity.type);
               const isEditing = editingActivityId === (activity.id || `${index}`);
               const top = getPosition(activity.time);
-              const height = getHeight(activity);
+              const heightPx = getHeightPx(activity);
               const duration = getDuration(activity);
 
               return (
@@ -161,37 +217,37 @@ function VerticalTimeline({
                   key={activity.id || index}
                   style={{
                     position: 'absolute',
-                    top: `${top}%`,
-                    height: `${height}%`,
-                    left: 0,
-                    right: 0,
-                    minHeight: isEditing ? '180px' : '60px',
+                    top: `${top}px`,
+                    height: `${heightPx}px`,
+                    left: '4px',
+                    right: '4px',
+                    minHeight: isEditing ? '140px' : '50px',
                   }}
-                  className={`flex flex-col rounded-lg border ${colorClass} p-3 transition-all overflow-hidden hover:shadow-lg group`}
+                  className={`flex flex-col rounded-lg border ${colorClass} p-2 transition-all overflow-hidden hover:shadow-lg group`}
                 >
-                  <div className="flex gap-2 items-start mb-1 flex-shrink-0">
-                    <Icon className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span className="text-xs font-mono opacity-70 flex-shrink-0">
+                  <div className="flex gap-1.5 items-start mb-1 flex-shrink-0">
+                    <Icon className="w-3 h-3 shrink-0 mt-0.5" />
+                    <span className="text-[9px] font-mono opacity-70 flex-shrink-0 min-w-fit">
                       {activity.time}
                       {activity.endTime && ` - ${activity.endTime}`}
                     </span>
                   </div>
 
                   {isEditing ? (
-                    <div className="space-y-1 flex-1 overflow-y-auto">
-                      <div className="flex gap-1">
+                    <div className="space-y-0.5 flex-1 overflow-y-auto text-[11px]">
+                      <div className="flex gap-0.5">
                         <Input
                           type="time"
                           defaultValue={activity.time.slice(0, 5)}
                           onChange={(e) => onSaveEdit(index, { time: e.target.value })}
-                          className="w-20 h-7 text-xs"
+                          className="w-16 h-6 text-[9px] p-1"
                         />
                         {activity.endTime && (
                           <Input
                             type="time"
                             defaultValue={activity.endTime.slice(0, 5)}
                             onChange={(e) => onSaveEdit(index, { endTime: e.target.value })}
-                            className="w-20 h-7 text-xs"
+                            className="w-16 h-6 text-[9px] p-1"
                           />
                         )}
                       </div>
@@ -199,31 +255,33 @@ function VerticalTimeline({
                         placeholder="Title"
                         defaultValue={activity.title}
                         onChange={(e) => onSaveEdit(index, { title: e.target.value })}
-                        className="text-xs h-7"
+                        className="text-[9px] h-6 p-1"
                       />
                       <textarea
                         placeholder="Description"
                         defaultValue={activity.description || ''}
                         onChange={(e) => onSaveEdit(index, { description: e.target.value })}
-                        className="w-full text-xs p-1 rounded bg-muted/50 border border-border resize-none h-12"
+                        className="w-full text-[9px] p-1 rounded bg-muted/50 border border-border resize-none h-10"
                       />
                     </div>
                   ) : (
                     <>
-                      <p className="font-semibold text-xs flex-shrink-0 line-clamp-2">{activity.title}</p>
-                      {activity.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2 overflow-hidden flex-shrink-0">
+                      <p className="font-semibold text-[10px] flex-shrink-0 line-clamp-1 leading-tight">
+                        {activity.title}
+                      </p>
+                      {activity.description && heightPx > 80 && (
+                        <p className="text-[8px] text-muted-foreground line-clamp-1 flex-shrink-0 leading-tight">
                           {activity.description}
                         </p>
                       )}
-                      {activity.duration && (
-                        <Badge variant="outline" className="text-[9px] w-fit flex-shrink-0 mt-auto">
+                      {activity.duration && heightPx > 50 && (
+                        <Badge variant="outline" className="text-[8px] w-fit flex-shrink-0 mt-auto h-4 px-1 py-0">
                           {activity.duration} min
                         </Badge>
                       )}
-                      {activity.insiderTip && (
-                        <div className="text-xs text-purple-400 flex-shrink-0 line-clamp-1 mt-auto">
-                          <Lightbulb className="w-2.5 h-2.5 inline mr-1" />
+                      {activity.insiderTip && heightPx > 100 && (
+                        <div className="text-[8px] text-purple-400 flex-shrink-0 line-clamp-1 mt-auto leading-tight">
+                          <Lightbulb className="w-2 h-2 inline mr-0.5" />
                           {activity.insiderTip}
                         </div>
                       )}
@@ -234,7 +292,7 @@ function VerticalTimeline({
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+                      className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 p-0"
                       onClick={() => onEdit(activity.id, index)}
                     >
                       Edit
