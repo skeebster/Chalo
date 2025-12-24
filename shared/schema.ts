@@ -51,6 +51,9 @@ export const places = pgTable("places", {
   // Tags for filtering
   kidFriendly: boolean("kid_friendly").default(true),
   indoorOutdoor: text("indoor_outdoor"), // 'indoor', 'outdoor', 'both'
+  // Location coordinates for weather
+  latitude: numeric("latitude"),
+  longitude: numeric("longitude"),
   // User data
   visited: boolean("visited").default(false),
   visitedDate: date("visited_date"),

@@ -27,9 +27,10 @@ export function PlaceCard({ place, onClick }: PlaceCardProps) {
   // Check if this is a highly-rated place (4.8+)
   const isHighlyRated = place.googleRating ? parseFloat(place.googleRating) >= 4.8 : false;
   
-  // Fetch weather for the destination area (using home coordinates since all places are nearby)
-  // Home: 8 Canvass Ct, Somerset, NJ 08873 = 40.5018, -74.4518
-  const { data: weather } = useWeather(40.5018, -74.4518);
+  // Fetch weather for the destination's actual location
+  const lat = place.latitude ? parseFloat(place.latitude) : null;
+  const lng = place.longitude ? parseFloat(place.longitude) : null;
+  const { data: weather } = useWeather(lat, lng);
 
   return (
     <motion.div

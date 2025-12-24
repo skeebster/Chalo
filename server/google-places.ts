@@ -259,7 +259,7 @@ async function getFullPlaceDetails(placeId: string): Promise<any | null> {
       headers: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
-        "X-Goog-FieldMask": "id,displayName,formattedAddress,addressComponents,rating,userRatingCount,reviews,regularOpeningHours,priceLevel,types,primaryType,primaryTypeDisplayName,editorialSummary,websiteUri,nationalPhoneNumber,googleMapsUri,photos,accessibilityOptions,parkingOptions,paymentOptions,currentOpeningHours",
+        "X-Goog-FieldMask": "id,displayName,formattedAddress,addressComponents,location,rating,userRatingCount,reviews,regularOpeningHours,priceLevel,types,primaryType,primaryTypeDisplayName,editorialSummary,websiteUri,nationalPhoneNumber,googleMapsUri,photos,accessibilityOptions,parkingOptions,paymentOptions,currentOpeningHours",
       },
     });
     
@@ -450,6 +450,10 @@ export async function lookupPlaceByName(placeName: string, additionalContext?: s
   const aiResearch = await researchPlaceWithAI(name, address, googleRating, category);
   
   // Map Google Places data to our schema with AI-enhanced content
+  // Extract coordinates from Google Places response
+  const latitude = details.location?.latitude?.toString() || null;
+  const longitude = details.location?.longitude?.toString() || null;
+  
   const place: Partial<InsertPlace> = {
     name,
     address: address || null,
@@ -476,6 +480,8 @@ export async function lookupPlaceByName(placeName: string, additionalContext?: s
     publicTransit: null,
     kidFriendly: aiResearch.kidFriendly ?? true,
     indoorOutdoor: aiResearch.indoorOutdoor || mapTypesToIndoorOutdoor(details.types) || "both",
+    latitude,
+    longitude,
     visited: false,
     visitedDate: null,
     userNotes: null,
