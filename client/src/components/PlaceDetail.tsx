@@ -253,7 +253,7 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl h-[90vh] p-0 overflow-hidden bg-card border-white/10" aria-describedby={undefined}>
+      <DialogContent className="max-w-3xl h-[90vh] p-0 overflow-hidden bg-card border-white/10 w-[95vw] sm:w-full" aria-describedby={undefined}>
         <VisuallyHidden>
           <DialogTitle>{place.name}</DialogTitle>
         </VisuallyHidden>
@@ -408,19 +408,19 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
               </>
             )}
           </div>
-          <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
+          <div className="p-3 sm:p-6 space-y-4 sm:space-y-8 overflow-x-hidden">
             {/* Overview - Now at the top */}
             {place.overview && (
               <section>
-                <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                  <Info className="w-5 h-5 text-primary" /> Overview
+                <h3 className="text-sm sm:text-lg font-bold text-white mb-2 sm:mb-3 flex items-center gap-2">
+                  <Info className="w-4 sm:w-5 h-4 sm:h-5 text-primary" /> Overview
                 </h3>
-                <p className="text-muted-foreground leading-relaxed">{place.overview}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed break-words">{place.overview}</p>
               </section>
             )}
 
             {/* Quick Stats Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
               <StatBox 
                 icon={Clock} 
                 label="Drive Time" 
@@ -466,27 +466,27 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
             ) : reviewData?.insights ? (
               <>
                 <section>
-                  <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-primary" /> Visitor Insights
-                    <Badge variant="outline" className="text-xs ml-2 text-muted-foreground border-muted-foreground/30">
-                      AI-analyzed from {reviewData.totalReviews?.toLocaleString() || 'multiple'} reviews
+                  <h3 className="text-sm sm:text-lg font-bold text-white mb-3 flex items-center gap-2 flex-wrap">
+                    <Sparkles className="w-4 sm:w-5 h-4 sm:h-5 text-primary" /> Visitor Insights
+                    <Badge variant="outline" className="text-[10px] sm:text-xs text-muted-foreground border-muted-foreground/30">
+                      {reviewData.totalReviews?.toLocaleString() || ''} reviews
                     </Badge>
                   </h3>
                   
                   {/* Sentiment Score */}
-                  <div className={`p-4 rounded-xl border mb-4 ${getSentimentBgColor(reviewData.insights.sentimentScore)}`}>
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className={`text-3xl font-bold ${getSentimentColor(reviewData.insights.sentimentScore)}`}>
+                  <div className={`p-3 sm:p-4 rounded-xl border mb-4 ${getSentimentBgColor(reviewData.insights.sentimentScore)}`}>
+                    <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                      <div className={`text-2xl sm:text-3xl font-bold ${getSentimentColor(reviewData.insights.sentimentScore)}`}>
                         {reviewData.insights.sentimentScore}
                       </div>
-                      <div>
-                        <div className={`font-semibold ${getSentimentColor(reviewData.insights.sentimentScore)}`}>
+                      <div className="min-w-0 flex-1">
+                        <div className={`font-semibold text-sm sm:text-base ${getSentimentColor(reviewData.insights.sentimentScore)}`}>
                           {reviewData.insights.sentimentLabel}
                         </div>
-                        <div className="text-xs text-muted-foreground">Overall Visitor Sentiment</div>
+                        <div className="text-[10px] sm:text-xs text-muted-foreground">Visitor Sentiment</div>
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed break-words">
                       {reviewData.insights.summary}
                     </p>
                   </div>
@@ -494,16 +494,16 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
                   {/* Pros and Cons */}
                   <div className="grid sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
                     {reviewData.insights.pros.length > 0 && (
-                      <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-xl">
-                        <div className="flex items-center gap-2 mb-3">
-                          <ThumbsUp className="w-4 h-4 text-green-400" />
-                          <span className="font-semibold text-green-400 text-sm">What Visitors Love</span>
+                      <div className="bg-green-500/10 border border-green-500/20 p-3 sm:p-4 rounded-xl">
+                        <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                          <ThumbsUp className="w-3 sm:w-4 h-3 sm:h-4 text-green-400 shrink-0" />
+                          <span className="font-semibold text-green-400 text-xs sm:text-sm">What Visitors Love</span>
                         </div>
-                        <ul className="space-y-2">
+                        <ul className="space-y-1.5 sm:space-y-2">
                           {reviewData.insights.pros.map((pro, i) => (
-                            <li key={i} className="flex gap-2 text-sm text-muted-foreground">
-                              <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
-                              <span>{pro}</span>
+                            <li key={i} className="flex gap-2 text-xs sm:text-sm text-muted-foreground">
+                              <CheckCircle2 className="w-3 sm:w-4 h-3 sm:h-4 text-green-400 shrink-0 mt-0.5" />
+                              <span className="break-words">{pro}</span>
                             </li>
                           ))}
                         </ul>
@@ -511,16 +511,16 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
                     )}
                     
                     {reviewData.insights.cons.length > 0 && (
-                      <div className="bg-orange-500/10 border border-orange-500/20 p-4 rounded-xl">
-                        <div className="flex items-center gap-2 mb-3">
-                          <ThumbsDown className="w-4 h-4 text-orange-400" />
-                          <span className="font-semibold text-orange-400 text-sm">Things to Consider</span>
+                      <div className="bg-orange-500/10 border border-orange-500/20 p-3 sm:p-4 rounded-xl">
+                        <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                          <ThumbsDown className="w-3 sm:w-4 h-3 sm:h-4 text-orange-400 shrink-0" />
+                          <span className="font-semibold text-orange-400 text-xs sm:text-sm">Things to Consider</span>
                         </div>
-                        <ul className="space-y-2">
+                        <ul className="space-y-1.5 sm:space-y-2">
                           {reviewData.insights.cons.map((con, i) => (
-                            <li key={i} className="flex gap-2 text-sm text-muted-foreground">
-                              <AlertCircle className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
-                              <span>{con}</span>
+                            <li key={i} className="flex gap-2 text-xs sm:text-sm text-muted-foreground">
+                              <AlertCircle className="w-3 sm:w-4 h-3 sm:h-4 text-orange-400 shrink-0 mt-0.5" />
+                              <span className="break-words">{con}</span>
                             </li>
                           ))}
                         </ul>
@@ -547,16 +547,16 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
 
                   {/* Visitor Tips from Reviews */}
                   {reviewData.insights.visitorTips.length > 0 && (
-                    <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Lightbulb className="w-4 h-4 text-blue-400" />
-                        <span className="font-semibold text-blue-400 text-sm">Tips from Recent Visitors</span>
+                    <div className="bg-blue-500/10 border border-blue-500/20 p-3 sm:p-4 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                        <Lightbulb className="w-3 sm:w-4 h-3 sm:h-4 text-blue-400 shrink-0" />
+                        <span className="font-semibold text-blue-400 text-xs sm:text-sm">Tips from Recent Visitors</span>
                       </div>
-                      <ul className="space-y-2">
+                      <ul className="space-y-1.5 sm:space-y-2">
                         {reviewData.insights.visitorTips.map((tip, i) => (
-                          <li key={i} className="flex gap-2 text-sm text-muted-foreground">
-                            <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                            <span>{tip}</span>
+                          <li key={i} className="flex gap-2 text-xs sm:text-sm text-muted-foreground">
+                            <CheckCircle2 className="w-3 sm:w-4 h-3 sm:h-4 text-blue-400 shrink-0 mt-0.5" />
+                            <span className="break-words">{tip}</span>
                           </li>
                         ))}
                       </ul>
@@ -1099,28 +1099,28 @@ function StatBox({ icon: Icon, label, value, subValue, onClick }: { icon: any, l
   const Component = onClick ? 'button' : 'div';
   return (
     <Component 
-      className={`bg-white/5 border border-white/5 p-3 rounded-xl flex flex-col items-center justify-center text-center ${onClick ? 'cursor-pointer hover:bg-white/10 transition-colors' : ''}`}
+      className={`bg-white/5 border border-white/5 p-2 sm:p-3 rounded-xl flex flex-col items-center justify-center text-center ${onClick ? 'cursor-pointer hover:bg-white/10 transition-colors' : ''}`}
       onClick={onClick}
       data-testid={onClick ? `stat-${label.toLowerCase().replace(' ', '-')}` : undefined}
     >
-      <Icon className="w-5 h-5 text-primary mb-1" />
-      <span className="text-xs text-muted-foreground uppercase tracking-wider">{label}</span>
-      <span className="font-bold text-white">{value}</span>
-      {subValue && <span className="text-xs text-muted-foreground">{subValue}</span>}
+      <Icon className="w-4 sm:w-5 h-4 sm:h-5 text-primary mb-0.5 sm:mb-1" />
+      <span className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">{label}</span>
+      <span className="font-bold text-white text-sm sm:text-base">{value}</span>
+      {subValue && <span className="text-[10px] sm:text-xs text-muted-foreground">{subValue}</span>}
     </Component>
   );
 }
 
 function InfoCard({ icon: Icon, label, value }: { icon: any, label: string, value: string }) {
   return (
-    <div className="bg-white/5 border border-white/5 p-4 rounded-xl">
-      <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
-          <Icon className="w-4 h-4 text-primary" />
+    <div className="bg-white/5 border border-white/5 p-3 sm:p-4 rounded-xl">
+      <div className="flex items-start gap-2 sm:gap-3">
+        <div className="w-6 sm:w-8 h-6 sm:h-8 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+          <Icon className="w-3 sm:w-4 h-3 sm:h-4 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-1">{label}</span>
-          <p className="text-sm text-white leading-relaxed">{value}</p>
+          <span className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-1">{label}</span>
+          <p className="text-xs sm:text-sm text-white leading-relaxed break-words">{value}</p>
         </div>
       </div>
     </div>
