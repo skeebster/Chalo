@@ -126,11 +126,54 @@ export class DatabaseStorage implements IStorage {
   }
 
   async findPlaceByName(name: string): Promise<Place | undefined> {
-    // Use case-insensitive search to find duplicates
-    const [place] = await db.select().from(places).where(
+    // Normalize name for comparison
+    const normalized = name.trim().toLowerCase();
+    
+    // First try exact case-insensitive match
+    const [exactMatch] = await db.select().from(places).where(
       ilike(places.name, name.trim())
     );
-    return place;
+    if (exactMatch) return exactMatch;
+    
+    // Try partial match (contains) for catching variations
+    const allPlaces = await db.select().from(places);
+    for (const place of allPlaces) {
+      const placeName = place.name.toLowerCase();
+      // Check if one name contains the other (handles "Tree Escape" vs "Tree Escape Adventure Park")
+      if (placeName.includes(normalized) || normalized.includes(placeName)) {
+        // Additional check: similarity must be high (at least 60% overlap)
+        const shorter = placeName.length < normalized.length ? placeName : normalized;
+        const longer = placeName.length >= normalized.length ? placeName : normalized;
+        if (shorter.length / longer.length >= 0.5) {
+          return place;
+        }
+      }
+    }
+    
+    return undefined;
+  }
+
+  async findSimilarPlace(name: string, address?: string | null): Promise<Place | undefined> {
+    // First check by name
+    const byName = await this.findPlaceByName(name);
+    if (byName) return byName;
+    
+    // If address provided, check for same address
+    if (address) {
+      const normalizedAddr = address.trim().toLowerCase();
+      const allPlaces = await db.select().from(places);
+      for (const place of allPlaces) {
+        if (place.address) {
+          const placeAddr = place.address.toLowerCase();
+          // Check if addresses are similar (same street number and street name)
+          if (placeAddr.includes(normalizedAddr) || normalizedAddr.includes(placeAddr)) {
+            return place;
+          }
+        }
+      }
+    }
+    
+    return undefined;
   }
 
   async createPlace(place: InsertPlace): Promise<Place> {

@@ -775,6 +775,16 @@ export async function registerRoutes(
   app.post(api.places.create.path, async (req, res) => {
     try {
       const input = api.places.create.input.parse(req.body);
+      
+      // Check for duplicates before creating
+      const existingPlace = await storage.findSimilarPlace(input.name, input.address);
+      if (existingPlace) {
+        return res.status(409).json({ 
+          message: `A similar place "${existingPlace.name}" already exists`,
+          existingPlace 
+        });
+      }
+      
       const place = await storage.createPlace(input);
       res.status(201).json(place);
     } catch (err) {
@@ -817,11 +827,18 @@ export async function registerRoutes(
   app.post(api.places.import.path, async (req, res) => {
     try {
       let count = 0;
+      let skipped = 0;
       for (const place of samplePlaces) {
+        // Skip duplicates
+        const existing = await storage.findSimilarPlace(place.name, place.address);
+        if (existing) {
+          skipped++;
+          continue;
+        }
         await storage.createPlace(place as any); // Casting because numeric strings in sample vs numeric type in DB
         count++;
       }
-      res.json({ success: true, count });
+      res.json({ success: true, count, skipped });
     } catch (error) {
       console.error("Import error:", error);
       res.status(500).json({ success: false, count: 0 });
