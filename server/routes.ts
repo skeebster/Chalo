@@ -1080,8 +1080,15 @@ export async function registerRoutes(
       if (imageUrl) {
         userContent.push({ type: "image_url", image_url: { url: imageUrl } });
       } else if (imageData) {
-        // Assume imageData is base64
-        userContent.push({ type: "image_url", image_url: { url: imageData } });
+        // Format base64 data as proper data URL if not already formatted
+        let formattedUrl = imageData;
+        if (!imageData.startsWith('data:')) {
+          // Determine MIME type from fileType or default to jpeg
+          const mimeType = fileType === 'pdf' ? 'application/pdf' : 
+                          fileType === 'png' ? 'image/png' : 'image/jpeg';
+          formattedUrl = `data:${mimeType};base64,${imageData}`;
+        }
+        userContent.push({ type: "image_url", image_url: { url: formattedUrl } });
       } else {
         return res.status(400).json({ message: "Image URL or data required" });
       }
