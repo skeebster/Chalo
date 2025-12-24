@@ -58,6 +58,8 @@ export default function TripPlanner() {
   const [showPlaceSelector, setShowPlaceSelector] = useState(false);
   const [generatedItinerary, setGeneratedItinerary] = useState<TripItinerary | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
+  const [editedSchedule, setEditedSchedule] = useState<ItineraryActivity[] | null>(null);
 
   const { data: places = [], isLoading: placesLoading } = useQuery<Place[]>({
     queryKey: ["/api/places"],
@@ -203,7 +205,7 @@ export default function TripPlanner() {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-6">
+        <div className={`grid gap-6 ${generatedItinerary ? 'grid-cols-1' : 'lg:grid-cols-2'}`}>
           {/* Left Column - Build Your Trip */}
           <div className="space-y-4">
             <Card>
@@ -343,16 +345,35 @@ export default function TripPlanner() {
           </div>
 
           {/* Right Column - Generated Itinerary or Past Itineraries */}
-          <div className="space-y-4">
+          <div className={`${generatedItinerary ? 'col-span-full' : ''}`}>
             {generatedItinerary ? (
               <Card className="border-primary/30">
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-primary" />
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <CardTitle className="text-xl sm:text-2xl flex items-center gap-2">
+                      <Sparkles className="w-6 h-6 text-primary" />
                       {generatedItinerary.name}
                     </CardTitle>
                     <div className="flex gap-1">
+                      {editingActivityId && (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => {
+                            if (editedSchedule && generatedItinerary) {
+                              const updatedItinerary = { ...generatedItinerary, schedule: editedSchedule };
+                              setGeneratedItinerary(updatedItinerary);
+                              setEditingActivityId(null);
+                              setEditedSchedule(null);
+                              toast({ title: "Itinerary updated" });
+                            }
+                          }}
+                          data-testid="button-save-edits"
+                        >
+                          <Save className="w-4 h-4 mr-1" />
+                          Save
+                        </Button>
+                      )}
                       <Button
                         size="icon"
                         variant="ghost"
@@ -369,14 +390,18 @@ export default function TripPlanner() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={() => setGeneratedItinerary(null)}
+                        onClick={() => {
+                          setGeneratedItinerary(null);
+                          setEditingActivityId(null);
+                          setEditedSchedule(null);
+                        }}
                         data-testid="button-close-itinerary"
                       >
                         <X className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap mt-2">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
                       {generatedItinerary.tripDate}
@@ -389,49 +414,155 @@ export default function TripPlanner() {
                     )}
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-[500px] pr-4">
-                    <div className="space-y-1">
-                      {(generatedItinerary.schedule as ItineraryActivity[]).map((activity, index) => {
+                <CardContent className="space-y-4">
+                  {/* Legend */}
+                  <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
+                    <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Activity Legend</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-blue-500/30 border border-blue-500/50"></div>
+                        <span className="text-xs text-muted-foreground">Travel</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-amber-500/30 border border-amber-500/50"></div>
+                        <span className="text-xs text-muted-foreground">Food</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-orange-500/30 border border-primary/50"></div>
+                        <span className="text-xs text-muted-foreground">Activity</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-green-500/30 border border-green-500/50"></div>
+                        <span className="text-xs text-muted-foreground">Arrival</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-purple-500/30 border border-purple-500/50"></div>
+                        <span className="text-xs text-muted-foreground">Tips</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-muted border border-muted"></div>
+                        <span className="text-xs text-muted-foreground">Depart</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <ScrollArea className="h-[600px] pr-4 rounded-lg border border-border/30">
+                    <div className="space-y-2">
+                      {(editedSchedule || (generatedItinerary.schedule as ItineraryActivity[])).map((activity, index) => {
                         const Icon = getActivityIcon(activity.type);
                         const colorClass = getActivityColor(activity.type);
+                        const isEditing = editingActivityId === (activity.id || `${index}`);
                         
                         return (
                           <div key={activity.id || index} className="relative">
                             {/* Timeline line */}
-                            {index < (generatedItinerary.schedule as ItineraryActivity[]).length - 1 && (
-                              <div className="absolute left-5 top-12 bottom-0 w-0.5 bg-border" />
+                            {index < (editedSchedule || (generatedItinerary.schedule as ItineraryActivity[])).length - 1 && (
+                              <div className="absolute left-6 top-14 bottom-0 w-0.5 bg-border" />
                             )}
                             
-                            <div className={`flex gap-3 p-3 rounded-lg border ${colorClass}`}>
+                            <div className={`flex gap-4 p-4 rounded-lg border ${colorClass} hover:bg-black/20 transition-colors group`}>
                               <div className="shrink-0 mt-0.5">
                                 <Icon className="w-5 h-5" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-xs font-mono opacity-70">
-                                    {activity.time}
-                                    {activity.endTime && ` - ${activity.endTime}`}
-                                  </span>
-                                  {activity.duration && (
-                                    <Badge variant="outline" className="text-[10px]">
-                                      {activity.duration} min
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="font-medium text-sm">{activity.title}</p>
-                                {activity.description && (
-                                  <p className="text-xs text-muted-foreground mt-1 break-words">
-                                    {activity.description}
-                                  </p>
-                                )}
-                                {activity.insiderTip && (
-                                  <div className="mt-2 flex gap-2 text-xs text-purple-400 bg-purple-500/10 p-2 rounded">
-                                    <Lightbulb className="w-3 h-3 shrink-0 mt-0.5" />
-                                    <span className="break-words">{activity.insiderTip}</span>
+                                {isEditing ? (
+                                  <div className="space-y-2">
+                                    <div className="flex gap-2">
+                                      <Input
+                                        type="time"
+                                        defaultValue={activity.time.slice(0, 5)}
+                                        onChange={(e) => {
+                                          if (editedSchedule) {
+                                            const updated = [...editedSchedule];
+                                            updated[index].time = e.target.value;
+                                            setEditedSchedule(updated);
+                                          }
+                                        }}
+                                        className="w-24 text-xs"
+                                      />
+                                      {activity.endTime && (
+                                        <Input
+                                          type="time"
+                                          defaultValue={activity.endTime.slice(0, 5)}
+                                          onChange={(e) => {
+                                            if (editedSchedule) {
+                                              const updated = [...editedSchedule];
+                                              updated[index].endTime = e.target.value;
+                                              setEditedSchedule(updated);
+                                            }
+                                          }}
+                                          className="w-24 text-xs"
+                                        />
+                                      )}
+                                    </div>
+                                    <Input
+                                      placeholder="Activity title"
+                                      defaultValue={activity.title}
+                                      onChange={(e) => {
+                                        if (editedSchedule) {
+                                          const updated = [...editedSchedule];
+                                          updated[index].title = e.target.value;
+                                          setEditedSchedule(updated);
+                                        }
+                                      }}
+                                      className="text-sm"
+                                    />
+                                    <textarea
+                                      placeholder="Description"
+                                      defaultValue={activity.description || ''}
+                                      onChange={(e) => {
+                                        if (editedSchedule) {
+                                          const updated = [...editedSchedule];
+                                          updated[index].description = e.target.value;
+                                          setEditedSchedule(updated);
+                                        }
+                                      }}
+                                      className="w-full text-xs p-2 rounded bg-muted/50 border border-border resize-none"
+                                      rows={2}
+                                    />
                                   </div>
+                                ) : (
+                                  <>
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-xs font-mono opacity-70">
+                                        {activity.time}
+                                        {activity.endTime && ` - ${activity.endTime}`}
+                                      </span>
+                                      {activity.duration && (
+                                        <Badge variant="outline" className="text-[10px]">
+                                          {activity.duration} min
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <p className="font-semibold text-sm">{activity.title}</p>
+                                    {activity.description && (
+                                      <p className="text-xs text-muted-foreground mt-1 break-words">
+                                        {activity.description}
+                                      </p>
+                                    )}
+                                    {activity.insiderTip && (
+                                      <div className="mt-2 flex gap-2 text-xs text-purple-400 bg-purple-500/10 p-2 rounded">
+                                        <Lightbulb className="w-3 h-3 shrink-0 mt-0.5" />
+                                        <span className="break-words">{activity.insiderTip}</span>
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                               </div>
+                              {!isEditing && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                  onClick={() => {
+                                    setEditedSchedule(generatedItinerary.schedule as ItineraryActivity[]);
+                                    setEditingActivityId(activity.id || `${index}`);
+                                  }}
+                                  data-testid={`button-edit-activity-${index}`}
+                                >
+                                  Edit
+                                </Button>
+                              )}
                             </div>
                           </div>
                         );
