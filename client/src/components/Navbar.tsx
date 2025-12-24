@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Compass, Map, Settings, UploadCloud } from "lucide-react";
+import { Compass, Map, Settings, UploadCloud, Route } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NavbarProps {
@@ -12,8 +12,8 @@ export function Navbar({ onUploadClick }: NavbarProps) {
 
   const navItems = [
     { href: "/", label: "Explore", icon: Compass },
+    { href: "/trip-planner", label: "Trip Planner", icon: Route },
     { href: "/planner", label: "My Plans", icon: Map },
-    { href: "/settings", label: "Settings", icon: Settings },
   ];
 
   return (

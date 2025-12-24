@@ -103,6 +103,37 @@ export const weekendPlans = pgTable("weekend_plans", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// === Trip Itinerary Activity Type ===
+export interface ItineraryActivity {
+  id: string;
+  time: string; // "9:00 AM"
+  endTime?: string; // "11:00 AM"
+  type: 'arrival' | 'activity' | 'meal' | 'drive' | 'tip' | 'departure';
+  title: string;
+  description?: string;
+  placeId?: number;
+  placeName?: string;
+  duration?: number; // minutes
+  insiderTip?: string;
+  icon?: string;
+}
+
+// === Trip Itineraries Table ===
+export const tripItineraries = pgTable("trip_itineraries", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  tripDate: date("trip_date").notNull(),
+  placeIds: jsonb("place_ids").$type<number[]>().default([]),
+  schedule: jsonb("schedule").$type<ItineraryActivity[]>().default([]),
+  startTime: text("start_time").default("9:00 AM"),
+  endTime: text("end_time").default("6:00 PM"),
+  totalDriveTime: integer("total_drive_time"), // minutes
+  optimizationNotes: text("optimization_notes"),
+  status: text("status").default('draft'), // draft, optimized, saved
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // === Schemas ===
 export const insertPlaceSchema = createInsertSchema(places).omit({ 
   id: true, 
@@ -132,6 +163,12 @@ export const insertFavoriteSchema = createInsertSchema(favorites).omit({
   createdAt: true 
 });
 
+export const insertTripItinerarySchema = createInsertSchema(tripItineraries).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
 // === Types ===
 export type Place = typeof places.$inferSelect;
 export type InsertPlace = z.infer<typeof insertPlaceSchema>;
@@ -147,6 +184,9 @@ export type InsertWeekendPlan = z.infer<typeof insertWeekendPlanSchema>;
 
 export type Favorite = typeof favorites.$inferSelect;
 export type InsertFavorite = z.infer<typeof insertFavoriteSchema>;
+
+export type TripItinerary = typeof tripItineraries.$inferSelect;
+export type InsertTripItinerary = z.infer<typeof insertTripItinerarySchema>;
 
 // === API Types ===
 export type CreatePlaceRequest = InsertPlace;

@@ -1600,6 +1600,277 @@ export async function registerRoutes(
     }
   });
 
+  // === Trip Itinerary Routes ===
+  
+  // Get all trip itineraries
+  app.get("/api/itineraries", async (req, res) => {
+    try {
+      const itineraries = await storage.getTripItineraries();
+      res.json(itineraries);
+    } catch (error: any) {
+      console.error("Get itineraries error:", error);
+      res.status(500).json({ error: "Failed to get itineraries" });
+    }
+  });
+
+  // Get single trip itinerary
+  app.get("/api/itineraries/:id", async (req, res) => {
+    try {
+      const itinerary = await storage.getTripItinerary(parseInt(req.params.id));
+      if (!itinerary) {
+        return res.status(404).json({ error: "Itinerary not found" });
+      }
+      res.json(itinerary);
+    } catch (error: any) {
+      console.error("Get itinerary error:", error);
+      res.status(500).json({ error: "Failed to get itinerary" });
+    }
+  });
+
+  // Create trip itinerary
+  app.post("/api/itineraries", async (req, res) => {
+    try {
+      const itinerary = await storage.createTripItinerary(req.body);
+      res.json(itinerary);
+    } catch (error: any) {
+      console.error("Create itinerary error:", error);
+      res.status(500).json({ error: "Failed to create itinerary" });
+    }
+  });
+
+  // Update trip itinerary
+  app.put("/api/itineraries/:id", async (req, res) => {
+    try {
+      const itinerary = await storage.updateTripItinerary(parseInt(req.params.id), req.body);
+      res.json(itinerary);
+    } catch (error: any) {
+      console.error("Update itinerary error:", error);
+      res.status(500).json({ error: "Failed to update itinerary" });
+    }
+  });
+
+  // Delete trip itinerary
+  app.delete("/api/itineraries/:id", async (req, res) => {
+    try {
+      await storage.deleteTripItinerary(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete itinerary error:", error);
+      res.status(500).json({ error: "Failed to delete itinerary" });
+    }
+  });
+
+  // Generate optimized itinerary with AI
+  app.post("/api/itineraries/generate", async (req, res) => {
+    try {
+      const { placeIds, tripDate, startTime = "9:00 AM", endTime = "6:00 PM" } = req.body;
+      
+      if (!placeIds || placeIds.length === 0) {
+        return res.status(400).json({ error: "At least one place is required" });
+      }
+      
+      // Fetch all places with full details
+      const placesData = await Promise.all(
+        placeIds.map((id: number) => storage.getPlace(id))
+      );
+      const validPlaces = placesData.filter(Boolean) as Place[];
+      
+      if (validPlaces.length === 0) {
+        return res.status(400).json({ error: "No valid places found" });
+      }
+      
+      // Build a comprehensive prompt with all place data
+      const placeDescriptions = validPlaces.map((p, idx) => {
+        const reviews = p.insiderTips || "";
+        const highlights = p.keyHighlights || "";
+        const duration = p.averageVisitDuration || "2-3 hours";
+        const bestTime = p.bestTimeOfDay || "any";
+        const overview = p.overview || "";
+        
+        return `
+PLACE ${idx + 1}: ${p.name}
+- Category: ${p.category || "General"}
+- Overview: ${overview}
+- Key Highlights: ${highlights}
+- Insider Tips from Reviews: ${reviews}
+- Average Visit Duration: ${duration}
+- Best Time of Day: ${bestTime}
+- Distance from home: ${p.distanceMiles} miles (${p.driveTimeMinutes} min drive)
+- Entry Fee: ${p.entryFee || "Free/Unknown"}
+- Address: ${p.address || "Unknown"}
+`;
+      }).join("\n");
+      
+      const prompt = `You are an expert travel planner creating a FOMO-proof itinerary. The user wants to experience EVERYTHING these places have to offer without missing any must-do activities.
+
+Create a detailed hour-by-hour schedule for ${tripDate || "today"} starting at ${startTime} and ending by ${endTime}.
+
+PLACES TO VISIT:
+${placeDescriptions}
+
+IMPORTANT GUIDELINES:
+1. Analyze all insider tips, highlights, and reviews to identify MUST-DO activities at each location
+2. Schedule activities in the optimal order based on:
+   - Best time of day for each attraction
+   - Geographic efficiency (minimize backtracking)
+   - Crowd patterns mentioned in reviews
+   - Special timing requirements (shows, experiences with set times)
+3. Include specific insider tips like "arrive 15 min early for best seats" or "skip X on weekends"
+4. Add meal suggestions at optimal times
+5. Include drive time between locations
+6. For each activity, include WHY it's important based on visitor reviews
+
+Return a JSON array of activities with this structure:
+[
+  {
+    "id": "unique-id-string",
+    "time": "9:00 AM",
+    "endTime": "11:00 AM",
+    "type": "arrival|activity|meal|drive|tip|departure",
+    "title": "Activity title",
+    "description": "What to do and why it's special",
+    "placeId": place_id_number_or_null,
+    "placeName": "Place Name or null",
+    "duration": minutes_as_number,
+    "insiderTip": "Pro tip from reviews if applicable"
+  }
+]
+
+Make sure to:
+- Start with driving from home
+- Include ALL must-see attractions and activities mentioned in highlights/tips
+- Add strategic breaks for meals at good local spots
+- End with departure time
+- Include specific tips from reviews at relevant points
+
+Return ONLY the JSON array, no other text.`;
+
+      const openAIBaseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || 'https://api.openai.com/v1';
+      const openAIKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+      
+      if (!openAIKey) {
+        return res.status(500).json({ error: "OpenAI API key not configured" });
+      }
+      
+      const response = await fetch(`${openAIBaseURL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openAIKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            { 
+              role: 'system', 
+              content: 'You are an expert travel planner specializing in creating optimized, FOMO-free itineraries. You analyze visitor reviews and insider tips to ensure travelers experience everything a destination has to offer.' 
+            },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.7,
+          max_tokens: 4000,
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+      
+      const data = await response.json() as any;
+      const content = data.choices?.[0]?.message?.content || '[]';
+      
+      // Parse the JSON response
+      let schedule;
+      try {
+        // Clean up the response - remove markdown code blocks if present
+        let cleanContent = content.trim();
+        if (cleanContent.startsWith('```json')) {
+          cleanContent = cleanContent.slice(7);
+        }
+        if (cleanContent.startsWith('```')) {
+          cleanContent = cleanContent.slice(3);
+        }
+        if (cleanContent.endsWith('```')) {
+          cleanContent = cleanContent.slice(0, -3);
+        }
+        schedule = JSON.parse(cleanContent.trim());
+      } catch (parseError) {
+        console.error("Failed to parse AI response:", content);
+        return res.status(500).json({ error: "Failed to generate schedule" });
+      }
+      
+      // Helper to parse 12-hour time to 24-hour format
+      const parseTimeTo24h = (timeStr: string): string => {
+        if (!timeStr) return "09:00";
+        const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+        if (!match) return "09:00";
+        let hours = parseInt(match[1]);
+        const minutes = match[2];
+        const period = match[3]?.toUpperCase();
+        if (period === "PM" && hours !== 12) hours += 12;
+        if (period === "AM" && hours === 12) hours = 0;
+        return `${hours.toString().padStart(2, '0')}:${minutes}`;
+      };
+
+      // Helper to add minutes to a time string
+      const addMinutesToTime = (timeStr: string, mins: number): string => {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        const totalMinutes = hours * 60 + minutes + mins;
+        const newHours = Math.min(23, Math.floor(totalMinutes / 60));
+        const newMinutes = totalMinutes % 60;
+        return `${newHours.toString().padStart(2, '0')}:${newMinutes.toString().padStart(2, '0')}`;
+      };
+
+      // Validate and normalize activities
+      let totalDriveTime = 0;
+      const normalizedSchedule = schedule.map((activity: any, index: number) => {
+        const startTime24h = parseTimeTo24h(activity.time);
+        const duration = activity.duration || 30; // Default 30 min if not specified
+        const endTime24h = activity.endTime 
+          ? parseTimeTo24h(activity.endTime) 
+          : addMinutesToTime(startTime24h, duration);
+        
+        if (activity.type === 'drive' && duration) {
+          totalDriveTime += duration;
+        }
+        
+        return {
+          id: activity.id || `activity-${index}-${Date.now()}`,
+          time: activity.time || startTime24h,
+          endTime: activity.endTime || endTime24h,
+          type: activity.type || 'activity',
+          title: activity.title || 'Activity',
+          description: activity.description || '',
+          placeId: activity.placeId || null,
+          placeName: activity.placeName || '',
+          duration: duration,
+          insiderTip: activity.insiderTip || '',
+        };
+      });
+      
+      // Create the itinerary
+      const name = validPlaces.length === 1 
+        ? `${validPlaces[0].name} Adventure`
+        : `${validPlaces.length}-Stop Adventure`;
+        
+      const itinerary = await storage.createTripItinerary({
+        name,
+        tripDate: tripDate || new Date().toISOString().split('T')[0],
+        placeIds,
+        schedule: normalizedSchedule,
+        startTime,
+        endTime,
+        totalDriveTime,
+        status: 'optimized',
+      });
+      
+      res.json(itinerary);
+    } catch (error: any) {
+      console.error("Generate itinerary error:", error);
+      res.status(500).json({ error: "Failed to generate itinerary" });
+    }
+  });
+
   return httpServer;
 }
 

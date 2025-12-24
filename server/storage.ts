@@ -1,11 +1,12 @@
 import { db } from "./db";
 import {
-  places, screenshots, userPreferences, weekendPlans, favorites,
+  places, screenshots, userPreferences, weekendPlans, favorites, tripItineraries,
   type Place, type InsertPlace, type UpdatePlaceRequest,
   type Screenshot, type InsertScreenshot,
   type UserPreferences, type InsertUserPreferences,
   type WeekendPlan, type InsertWeekendPlan,
   type Favorite, type InsertFavorite,
+  type TripItinerary, type InsertTripItinerary,
   insertUserPreferencesSchema
 } from "@shared/schema";
 import { eq, desc, ilike, or, and, inArray, lte, gte, sql } from "drizzle-orm";
@@ -53,6 +54,13 @@ export interface IStorage {
   addFavorite(placeId: number): Promise<Favorite>;
   removeFavorite(placeId: number): Promise<void>;
   isFavorite(placeId: number): Promise<boolean>;
+
+  // Trip Itineraries
+  getTripItineraries(): Promise<TripItinerary[]>;
+  getTripItinerary(id: number): Promise<TripItinerary | undefined>;
+  createTripItinerary(itinerary: InsertTripItinerary): Promise<TripItinerary>;
+  updateTripItinerary(id: number, updates: Partial<InsertTripItinerary>): Promise<TripItinerary>;
+  deleteTripItinerary(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -309,6 +317,33 @@ export class DatabaseStorage implements IStorage {
   async isFavorite(placeId: number): Promise<boolean> {
     const [fav] = await db.select().from(favorites).where(eq(favorites.placeId, placeId));
     return !!fav;
+  }
+
+  // === Trip Itineraries ===
+  async getTripItineraries(): Promise<TripItinerary[]> {
+    return await db.select().from(tripItineraries).orderBy(desc(tripItineraries.tripDate));
+  }
+
+  async getTripItinerary(id: number): Promise<TripItinerary | undefined> {
+    const [itinerary] = await db.select().from(tripItineraries).where(eq(tripItineraries.id, id));
+    return itinerary;
+  }
+
+  async createTripItinerary(itinerary: InsertTripItinerary): Promise<TripItinerary> {
+    const [newItinerary] = await db.insert(tripItineraries).values(itinerary).returning();
+    return newItinerary;
+  }
+
+  async updateTripItinerary(id: number, updates: Partial<InsertTripItinerary>): Promise<TripItinerary> {
+    const [updated] = await db.update(tripItineraries)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(tripItineraries.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTripItinerary(id: number): Promise<void> {
+    await db.delete(tripItineraries).where(eq(tripItineraries.id, id));
   }
 }
 
