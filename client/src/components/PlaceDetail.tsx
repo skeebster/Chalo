@@ -530,18 +530,19 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
 
                   {/* Noteworthy Mentions */}
                   {reviewData.insights.noteworthyMentions.length > 0 && (
-                    <div className="mb-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <TrendingUp className="w-4 h-4 text-primary" />
-                        <span className="text-sm font-medium text-white">Worth Checking Out</span>
+                    <div className="mb-4 bg-primary/10 border border-primary/20 p-3 sm:p-4 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                        <TrendingUp className="w-3 sm:w-4 h-3 sm:h-4 text-primary shrink-0" />
+                        <span className="text-xs sm:text-sm font-semibold text-primary">Worth Checking Out</span>
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <ul className="space-y-1.5 sm:space-y-2">
                         {reviewData.insights.noteworthyMentions.map((item, i) => (
-                          <Badge key={i} className="bg-primary/20 text-primary border-primary/30 text-sm py-1.5 px-3">
-                            {item}
-                          </Badge>
+                          <li key={i} className="flex gap-2 text-xs sm:text-sm text-muted-foreground">
+                            <CheckCircle2 className="w-3 sm:w-4 h-3 sm:h-4 text-primary shrink-0 mt-0.5" />
+                            <span className="break-words">{item}</span>
+                          </li>
                         ))}
-                      </div>
+                      </ul>
                     </div>
                   )}
 
@@ -587,12 +588,12 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
             {/* Highlights */}
             {place.keyHighlights && (
               <section>
-                <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                  <Star className="w-5 h-5 text-primary" /> Highlights
+                <h3 className="text-sm sm:text-lg font-bold text-white mb-2 sm:mb-3 flex items-center gap-2">
+                  <Star className="w-4 sm:w-5 h-4 sm:h-5 text-primary" /> Highlights
                 </h3>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5 sm:gap-2">
                   {parseHighlights(place.keyHighlights).map((highlight, i) => (
-                    <Badge key={i} variant="secondary" className="text-xs py-1.5 px-3">
+                    <Badge key={i} variant="secondary" className="text-[10px] sm:text-xs py-1 sm:py-1.5 px-2 sm:px-3 whitespace-normal text-left max-w-full">
                       {highlight}
                     </Badge>
                   ))}
@@ -642,15 +643,15 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
 
                     {/* Pro Tips */}
                     <div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <Lightbulb className="w-4 h-4 text-amber-400" />
-                        <span className="font-semibold text-amber-400 text-sm">Insider Knowledge</span>
+                      <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                        <Lightbulb className="w-3 sm:w-4 h-3 sm:h-4 text-amber-400 shrink-0" />
+                        <span className="font-semibold text-amber-400 text-xs sm:text-sm">Insider Knowledge</span>
                       </div>
-                      <ul className="space-y-2">
+                      <ul className="space-y-1.5 sm:space-y-2">
                         {parseTextToBullets(place.insiderTips).slice(0, 5).map((tip, i) => (
-                          <li key={i} className="flex gap-2 text-sm text-muted-foreground">
-                            <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                            <span>{tip}</span>
+                          <li key={i} className="flex gap-2 text-xs sm:text-sm text-muted-foreground">
+                            <CheckCircle2 className="w-3 sm:w-4 h-3 sm:h-4 text-amber-400 shrink-0 mt-0.5" />
+                            <span className="break-words">{tip}</span>
                           </li>
                         ))}
                       </ul>
@@ -703,14 +704,14 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
             {/* Standard Insider Tips (for places under 4.8 rating) */}
             {!isHighlyRated && place.insiderTips && (
               <section>
-                <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                  <Lightbulb className="w-5 h-5 text-primary" /> Insider Tips
+                <h3 className="text-sm sm:text-lg font-bold text-white mb-2 sm:mb-3 flex items-center gap-2">
+                  <Lightbulb className="w-4 sm:w-5 h-4 sm:h-5 text-primary" /> Insider Tips
                 </h3>
-                <div className="bg-primary/5 p-4 rounded-xl border border-primary/10 space-y-3">
+                <div className="bg-primary/5 p-3 sm:p-4 rounded-xl border border-primary/10 space-y-2 sm:space-y-3">
                   {parseTextToBullets(place.insiderTips).map((tip, i) => (
-                    <div key={i} className="flex gap-3">
-                      <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                      <p className="text-sm text-muted-foreground leading-relaxed">{tip}</p>
+                    <div key={i} className="flex gap-2 sm:gap-3">
+                      <CheckCircle2 className="w-3 sm:w-4 h-3 sm:h-4 text-primary mt-0.5 shrink-0" />
+                      <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed break-words">{tip}</p>
                     </div>
                   ))}
                 </div>
@@ -721,10 +722,10 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
 
             {/* Practical Info Grid */}
             <section>
-              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <Info className="w-5 h-5 text-primary" /> Practical Information
+              <h3 className="text-sm sm:text-lg font-bold text-white mb-3 sm:mb-4 flex items-center gap-2">
+                <Info className="w-4 sm:w-5 h-4 sm:h-5 text-primary" /> Practical Information
               </h3>
-              <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
+              <div className="grid sm:grid-cols-2 gap-2 sm:gap-4">
                 {place.bestSeasons && (
                   <InfoCard icon={Sun} label="Best Seasons" value={place.bestSeasons} />
                 )}
