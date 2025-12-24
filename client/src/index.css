@@ -98,3 +98,41 @@
 .delay-100 { animation-delay: 100ms; }
 .delay-200 { animation-delay: 200ms; }
 .delay-300 { animation-delay: 300ms; }
+
+/* Weather Icon Animations */
+@keyframes rain {
+  0% { 
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% { 
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes float {
+  0%, 100% { 
+    transform: translateY(0) translateX(0);
+  }
+  50% { 
+    transform: translateY(-2px) translateX(1px);
+  }
+}
+
+@keyframes snow-fall {
+  0% { 
+    opacity: 0;
+    transform: translateY(-2px) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% { 
+    opacity: 0;
+    transform: translateY(3px) rotate(180deg);
+  }
+}

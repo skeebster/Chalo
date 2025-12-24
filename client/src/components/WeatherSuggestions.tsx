@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Place } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Cloud, Sun, CloudRain, Snowflake, Wind, Thermometer, Umbrella, TreePine, Home as HomeIcon, Droplets } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Cloud, Sun, CloudRain, Snowflake, Wind, Thermometer, Umbrella, TreePine, Home as HomeIcon, Droplets, ExternalLink } from "lucide-react";
 import { isSaturday, isSunday, nextSaturday, format, isToday, addDays } from "date-fns";
 
 interface WeatherData {
@@ -71,6 +73,7 @@ function celsiusToFahrenheit(celsius: number): number {
 }
 
 export function WeatherSuggestions({ places, onPlaceClick }: WeatherSuggestionsProps) {
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const today = new Date();
   const isWeekend = isSaturday(today) || isSunday(today);
   const targetDate = isWeekend ? today : nextSaturday(today);
@@ -202,46 +205,148 @@ export function WeatherSuggestions({ places, onPlaceClick }: WeatherSuggestionsP
               const DayIcon = getWeatherIcon(weather.daily.weathercode[i]);
               const high = Math.round(weather.daily.temperature_2m_max[i]);
               const low = Math.round(weather.daily.temperature_2m_min[i]);
-              const isRainy = [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(weather.daily.weathercode[i]);
-              const isSnowy = [71, 73, 75, 77, 85, 86].includes(weather.daily.weathercode[i]);
-              const isWindy = weather.daily.weathercode[i] >= 95;
-              const isSunny = weather.daily.weathercode[i] === 0 || weather.daily.weathercode[i] === 1;
+              const code = weather.daily.weathercode[i];
+              const isRainy = [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code);
+              const isSnowy = [71, 73, 75, 77, 85, 86].includes(code);
+              const isWindy = code >= 95;
+              const isSunny = code === 0 || code === 1;
+              const isCloudy = code >= 2 && code <= 48;
               
               return (
-                <div 
+                <button 
                   key={dateStr}
-                  className={`flex flex-col items-center py-1.5 px-0.5 rounded-md transition-colors ${i === dayIndex ? 'bg-primary/20' : ''}`}
+                  onClick={() => setSelectedDay(i)}
+                  className={`flex flex-col items-center py-2 px-1 rounded-lg transition-all cursor-pointer hover-elevate ${i === dayIndex ? 'bg-primary/20' : ''}`}
+                  data-testid={`weather-day-${i}`}
                 >
-                  <span className={`text-[9px] font-semibold ${i === 0 ? 'text-primary' : 'text-muted-foreground'}`}>
+                  <span className={`text-[9px] font-semibold mb-1 ${i === 0 ? 'text-primary' : 'text-muted-foreground'}`}>
                     {i === 0 ? 'NOW' : format(date, 'EEE').toUpperCase().slice(0, 2)}
                   </span>
                   
-                  <div className="relative my-1">
+                  <div className="relative h-8 flex items-center justify-center">
                     {isWindy ? (
-                      <div className="flex items-center justify-center rounded-full px-1 py-0.5 bg-red-500/80">
-                        <Wind className="w-3 h-3 text-white" />
+                      <div className="flex items-center justify-center rounded-full px-1.5 py-1 bg-red-500/80 animate-pulse">
+                        <Wind className="w-4 h-4 text-white animate-[spin_3s_linear_infinite]" />
+                      </div>
+                    ) : isSunny ? (
+                      <Sun className="w-6 h-6 text-amber-400 animate-[pulse_2s_ease-in-out_infinite] drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]" />
+                    ) : isSnowy ? (
+                      <div className="relative">
+                        <Snowflake className="w-5 h-5 text-blue-300 animate-[spin_8s_linear_infinite] drop-shadow-[0_0_4px_rgba(147,197,253,0.5)]" />
+                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
+                          {[0, 1, 2].map(j => (
+                            <div 
+                              key={j} 
+                              className="w-1 h-1 rounded-full bg-blue-300 animate-[bounce_1s_ease-in-out_infinite]" 
+                              style={{ animationDelay: `${j * 0.2}s` }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ) : isRainy ? (
+                      <div className="relative">
+                        <CloudRain className="w-5 h-5 text-blue-400 drop-shadow-[0_0_4px_rgba(96,165,250,0.4)]" />
+                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
+                          {[0, 1, 2].map(j => (
+                            <div 
+                              key={j} 
+                              className="w-0.5 h-2 rounded-full bg-blue-400 animate-[rain_0.8s_linear_infinite]" 
+                              style={{ animationDelay: `${j * 0.15}s` }}
+                            />
+                          ))}
+                        </div>
                       </div>
                     ) : (
-                      <>
-                        <DayIcon className={`w-4 h-4 ${isSunny ? 'text-amber-400' : 'text-muted-foreground'}`} />
-                        {(isRainy || isSnowy) && (
-                          <div className="flex gap-px justify-center">
-                            {[0, 1, 2].map(j => (
-                              <div key={j} className="w-0.5 h-1 rounded-full bg-blue-400" />
-                            ))}
-                          </div>
-                        )}
-                      </>
+                      <Cloud className="w-5 h-5 text-muted-foreground animate-[float_3s_ease-in-out_infinite]" />
                     )}
                   </div>
                   
-                  <span className="text-[10px] font-medium text-foreground">{high}°</span>
+                  <span className="text-[10px] font-medium text-foreground mt-1">{high}°</span>
                   <span className="text-[9px] text-muted-foreground">{low}°</span>
-                </div>
+                </button>
               );
             })}
           </div>
         </div>
+
+        {/* Day Detail Popup */}
+        <Dialog open={selectedDay !== null} onOpenChange={() => setSelectedDay(null)}>
+          <DialogContent className="sm:max-w-md">
+            {selectedDay !== null && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    {(() => {
+                      const code = weather.daily.weathercode[selectedDay];
+                      const Icon = getWeatherIcon(code);
+                      const isSunny = code === 0 || code === 1;
+                      return <Icon className={`w-6 h-6 ${isSunny ? 'text-amber-400' : 'text-blue-400'}`} />;
+                    })()}
+                    {format(new Date(weather.daily.time[selectedDay] + 'T00:00:00'), 'EEEE, MMMM d')}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-muted/50">
+                    <div>
+                      <p className="text-4xl font-light text-foreground">
+                        {Math.round(weather.daily.temperature_2m_max[selectedDay])}°
+                      </p>
+                      <p className="text-lg text-muted-foreground font-medium">
+                        {getWeatherDescription(weather.daily.weathercode[selectedDay])}
+                      </p>
+                    </div>
+                    <div className="text-right space-y-1">
+                      <p className="text-sm">
+                        <span className="text-muted-foreground">High:</span>{' '}
+                        <span className="font-medium">{Math.round(weather.daily.temperature_2m_max[selectedDay])}°F</span>
+                      </p>
+                      <p className="text-sm">
+                        <span className="text-muted-foreground">Low:</span>{' '}
+                        <span className="font-medium">{Math.round(weather.daily.temperature_2m_min[selectedDay])}°F</span>
+                      </p>
+                      <p className="text-sm flex items-center justify-end gap-1">
+                        <Umbrella className="w-3 h-3 text-blue-400" />
+                        <span>{weather.daily.precipitation_probability_max[selectedDay]}% precip</span>
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      {isGoodOutdoorWeather(
+                        weather.daily.weathercode[selectedDay],
+                        weather.daily.temperature_2m_max[selectedDay],
+                        weather.daily.precipitation_probability_max[selectedDay]
+                      ) ? (
+                        <span className="flex items-center gap-1 text-green-400">
+                          <TreePine className="w-4 h-4" />
+                          Great day for outdoor activities!
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-primary">
+                          <HomeIcon className="w-4 h-4" />
+                          Consider indoor activities for this day.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  
+                  <div className="pt-2 border-t border-border">
+                    <a 
+                      href="https://open-meteo.com/" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      Weather data by Open-Meteo.com (Free API)
+                    </a>
+                  </div>
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Place Suggestions */}
         <div>
