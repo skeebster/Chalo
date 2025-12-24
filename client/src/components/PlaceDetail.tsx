@@ -408,7 +408,7 @@ export function PlaceDetail({ place, open, onOpenChange }: PlaceDetailProps) {
               </>
             )}
           </div>
-          <div className="p-3 sm:p-6 space-y-4 sm:space-y-8 overflow-x-hidden">
+          <div className="p-3 sm:p-6 space-y-4 sm:space-y-8 overflow-x-hidden w-full max-w-full box-border">
             {/* Overview - Now at the top */}
             {place.overview && (
               <section>

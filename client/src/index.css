@@ -46,14 +46,22 @@
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
   }
   body {
     @apply bg-background text-foreground font-sans antialiased selection:bg-primary/30 selection:text-primary-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    overflow-x: hidden;
   }
   
   h1, h2, h3, h4, h5, h6 {
     @apply font-display tracking-tight;
+  }
+  
+  /* Ensure text wraps properly on mobile */
+  p, span, li, div {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
   }
 }
 
