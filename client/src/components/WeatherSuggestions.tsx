@@ -199,7 +199,7 @@ export function WeatherSuggestions({ places, onPlaceClick }: WeatherSuggestionsP
           </div>
 
           {/* 7-Day Forecast Grid */}
-          <div className="relative z-10 grid grid-cols-7 gap-0.5 bg-muted/30 rounded-lg p-1">
+          <div className="relative z-10 flex justify-between gap-1.5">
             {weather.daily.time.slice(0, 7).map((dateStr, i) => {
               const date = new Date(dateStr + 'T00:00:00');
               const DayIcon = getWeatherIcon(weather.daily.weathercode[i]);
@@ -216,7 +216,7 @@ export function WeatherSuggestions({ places, onPlaceClick }: WeatherSuggestionsP
                 <button 
                   key={dateStr}
                   onClick={() => setSelectedDay(i)}
-                  className={`flex flex-col items-center py-2 px-1 rounded-lg transition-all cursor-pointer hover-elevate ${i === dayIndex ? 'bg-primary/20' : ''}`}
+                  className={`flex-1 flex flex-col items-center py-2 px-1 rounded-xl transition-all duration-200 cursor-pointer bg-muted/40 border border-transparent hover:border-primary/30 hover:bg-muted/60 hover:scale-110 hover:z-10 hover:shadow-lg ${i === dayIndex ? 'bg-primary/20 border-primary/40' : ''}`}
                   data-testid={`weather-day-${i}`}
                 >
                   <span className={`text-[9px] font-semibold mb-1 ${i === 0 ? 'text-primary' : 'text-muted-foreground'}`}>
