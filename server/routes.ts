@@ -750,7 +750,6 @@ export async function registerRoutes(
         indoorOutdoor: indoorOutdoor as 'indoor' | 'outdoor' | 'all' | undefined,
         maxDistance: maxDistance ? parseFloat(maxDistance) : undefined,
         minRating: minRating ? parseFloat(minRating) : undefined,
-        wheelchairAccessible: wheelchairAccessible === 'true',
         favoriteIds,
       });
       res.json(places);
@@ -1274,6 +1273,93 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Import voice error:", error);
       res.status(500).json({ success: false, error: "Failed to import from voice" });
+    }
+  });
+
+  // === Import from Instagram URL ===
+  app.post("/api/places/import-instagram", async (req, res) => {
+    try {
+      const { url } = req.body;
+      
+      if (!url) {
+        return res.status(400).json({ success: false, error: "Instagram URL is required" });
+      }
+      
+      const { extractPlaceFromInstagram, isInstagramUrl } = await import("./apify");
+      
+      if (!isInstagramUrl(url)) {
+        return res.status(400).json({ success: false, error: "Invalid Instagram URL. Please provide a link to an Instagram post or reel." });
+      }
+      
+      const result = await extractPlaceFromInstagram(url);
+      
+      if (!result) {
+        return res.status(400).json({ success: false, error: "Could not extract a place from this Instagram post. Make sure the post mentions a specific location." });
+      }
+      
+      // Try to look up more details via Google Places
+      let rawPlace: Partial<InsertPlace> = {
+        name: result.name,
+        overview: result.overview,
+        category: result.category,
+        imageUrl: result.imageUrl,
+        researchSources: result.source,
+      };
+      
+      if (result.address) {
+        rawPlace.address = result.address;
+      }
+      
+      // Preserve Instagram source info before Google enrichment
+      const instagramSource = result.source;
+      
+      // If we have a name, try Google Places lookup for full details
+      if (result.name) {
+        try {
+          const googleResult = await lookupPlaceByName(result.name, result.address);
+          if (googleResult.success && googleResult.place) {
+            rawPlace = { ...rawPlace, ...googleResult.place };
+            // Ensure we keep Instagram as research source (prepend to Google's if any)
+            if (googleResult.place.researchSources) {
+              rawPlace.researchSources = `${instagramSource}; ${googleResult.place.researchSources}`;
+            } else {
+              rawPlace.researchSources = instagramSource;
+            }
+          }
+        } catch (e) {
+          console.log("Google Places lookup failed, using Instagram data only:", e);
+        }
+      }
+      
+      // Check name exists
+      if (!rawPlace.name || rawPlace.name.trim().length === 0) {
+        return res.status(400).json({ success: false, error: "Could not determine place name from Instagram" });
+      }
+      
+      // Check for duplicates by name first, then by address if Google enriched
+      let existingPlace = await storage.findPlaceByName(rawPlace.name.trim());
+      
+      // If no name match but we have an address from Google, try finding by address
+      if (!existingPlace && rawPlace.address) {
+        existingPlace = await storage.findSimilarPlace(rawPlace.name.trim(), rawPlace.address);
+      }
+      if (existingPlace) {
+        const mergedUpdates = mergeRawWithExisting(existingPlace, rawPlace);
+        const updatedPlace = await storage.updatePlace(existingPlace.id, mergedUpdates);
+        return res.json({ success: true, place: updatedPlace, merged: true, message: "Updated existing place with information from Instagram" });
+      }
+      
+      // No duplicate - apply defaults and create new
+      const validatedPlace = validateAndFillPlace(rawPlace);
+      if (!validatedPlace) {
+        return res.status(400).json({ success: false, error: "Could not determine place name from Instagram" });
+      }
+      
+      const place = await storage.createPlace(validatedPlace);
+      res.json({ success: true, place, merged: false });
+    } catch (error: any) {
+      console.error("Import Instagram error:", error);
+      res.status(500).json({ success: false, error: error.message || "Failed to import from Instagram" });
     }
   });
 

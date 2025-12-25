@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, Upload, Loader2, CheckCircle, FileText, AlertCircle, Link, Mic, MicOff, Square } from 'lucide-react';
+import { SiInstagram } from 'react-icons/si';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -176,6 +177,44 @@ export function AddPlaceModal({ open, onOpenChange, onSuccess }: Props) {
     }
   };
 
+  // Helper to detect URL type
+  const isInstagramUrl = (url: string): boolean => {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname.includes("instagram.com") && 
+             (urlObj.pathname.includes("/p/") || urlObj.pathname.includes("/reel/"));
+    } catch {
+      return false;
+    }
+  };
+
+  const isGoogleMapsUrl = (url: string): boolean => {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname.toLowerCase();
+      const pathname = urlObj.pathname.toLowerCase();
+      
+      // Direct Maps URLs
+      if (hostname.includes("maps.google") || hostname === "maps.app.goo.gl") {
+        return true;
+      }
+      
+      // google.com/maps paths
+      if (hostname.includes("google.com") && pathname.startsWith("/maps")) {
+        return true;
+      }
+      
+      // goo.gl short links for Maps start with /maps
+      if (hostname === "goo.gl" && pathname.startsWith("/maps")) {
+        return true;
+      }
+      
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
   // URL handlers
   const handleUrlImport = async () => {
     if (!googleMapsUrl.trim()) return;
@@ -183,10 +222,18 @@ export function AddPlaceModal({ open, onOpenChange, onSuccess }: Props) {
     setUrlStatus('processing');
     setUrlError(null);
 
+    const url = googleMapsUrl.trim();
+    
     try {
-      const response = await apiRequest("POST", "/api/places/import-url", {
-        url: googleMapsUrl.trim(),
-      });
+      let endpoint = "/api/places/import-url";
+      
+      if (isInstagramUrl(url)) {
+        endpoint = "/api/places/import-instagram";
+      } else if (!isGoogleMapsUrl(url)) {
+        throw new Error("Please enter a Google Maps link or Instagram post/reel link");
+      }
+      
+      const response = await apiRequest("POST", endpoint, { url });
       const data = await response.json();
 
       if (!data.success) {
@@ -293,7 +340,7 @@ export function AddPlaceModal({ open, onOpenChange, onSuccess }: Props) {
             </TabsTrigger>
             <TabsTrigger value="url" className="data-[state=active]:bg-primary/20" data-testid="tab-url">
               <Link className="w-4 h-4 mr-2" />
-              Google Maps Link
+              Paste Link
             </TabsTrigger>
             <TabsTrigger value="voice" className="data-[state=active]:bg-primary/20" data-testid="tab-voice" disabled={!isVoiceSupported}>
               <Mic className="w-4 h-4 mr-2" />
@@ -382,20 +429,26 @@ export function AddPlaceModal({ open, onOpenChange, onSuccess }: Props) {
             <TabsContent value="url" className="mt-0">
               <div className="space-y-6">
                 <div className="text-center mb-6">
-                  <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Link className="w-8 h-8 text-primary" />
+                  <div className="flex items-center justify-center gap-3 mb-4">
+                    <div className="bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center">
+                      <Link className="w-6 h-6 text-primary" />
+                    </div>
+                    <span className="text-muted-foreground text-sm">or</span>
+                    <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 w-12 h-12 rounded-full flex items-center justify-center">
+                      <SiInstagram className="w-6 h-6 text-pink-400" />
+                    </div>
                   </div>
                   <p className="text-lg font-medium text-white mb-2">
-                    Paste a Google Maps Link
+                    Paste a Link
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    We'll look up the place details automatically
+                    Google Maps or Instagram post/reel - we'll extract the place details
                   </p>
                 </div>
 
                 <Input
                   type="url"
-                  placeholder="https://maps.google.com/..."
+                  placeholder="https://maps.google.com/... or https://instagram.com/p/..."
                   value={googleMapsUrl}
                   onChange={(e) => setGoogleMapsUrl(e.target.value)}
                   className="bg-secondary/50 border-white/10"
